@@ -6,7 +6,8 @@ dingk.Cooking = dingk.Cooking || {};
 dingk.Cooking.version = 1.0;
 
 /*:
- * @plugindesc Allows BOTW-style cooking.
+ * @plugindesc A cooking system that allows a player to select their own 
+ * ingredients.
  * @author dingk
  *
  * @param Max number of ingredients
@@ -45,10 +46,10 @@ dingk.Cooking.version = 1.0;
  * -----------------------------------------------------------------------------
  *   Introduction
  * -----------------------------------------------------------------------------
- * In The Legend of Zelda: Breath of the Wild, the devs introduced a cooking 
- * feature that allows Link to cook food as a way to regain health and gain 
- * buffs. Link has to choose his own ingredients and learn the recipes on his 
- * own. In this plugin, we will replicate that feature.
+ * This plugin allows a player to craft an item based on the combination of 
+ * ingredients they have chosen. If you've ever played, the Legend of Zelda: 
+ * Breath of the Wild, this is basically that cooking system. By assigning 
+ * items with this plugin's notetags, you can create a custom cooking system.
  *
  * How this plugin works:
  *  > Assign an item an ingredient category.
@@ -95,12 +96,22 @@ dingk.Cooking.version = 1.0;
  * ...
  * </Ingredients Required>
  *  > Define the recipe with 'string' being the ingredient category.
- *    (Optional: 'd' is the amount of items required.)
+ *    (Optional: 'd' is the amount of items required.) 
+ *
+ * <Ingredients Optional>
+ * string
+ * ...
+ * </Ingredients Optional>
+ *  > Allow an optional ingredient. More useful with YEP_ItemCore.
  *
  *  !!! YEP_ItemCore Dependency !!!
+ * The following notetags require YEP_ItemCore and independent items enabled. 
+ * This allows the plugin to automatically determine the stats and effects of 
+ * the cooked item. Cooked items will inherit the effects of the ingredients.
+ *
  * <Restrict Effect Copy>
  *  > By default, effects of the ingredients will copy over to the result. 
- *    Use this notetage to not copy effects in the default editor to the result.
+ *    Use this notetag to ignore any ingredient effects and define your own.
  * 
  * <Ingredient stat Recover: d>
  *  > Replace stat with HP, MP, or TP. When using this ingredient, the result 
@@ -157,7 +168,7 @@ dingk.Cooking.autoStats = dingk.Cooking.params['Auto Stats Determination'] === '
 var $dingkCooking = false;
 
 dingk.Cooking.paramIds = ['HP', 'MP', 'ATK', 'DEF', 'MAT', 'MDF', 'AGI', 'LUK'];
-for(let i in dingk.Cooking.paramIds) {
+for (let i in dingk.Cooking.paramIds) {
 	dingk.Cooking.paramIds[dingk.Cooking.paramIds[i]] = Number(i);
 	delete dingk.Cooking.paramIds[i];
 };
@@ -192,6 +203,7 @@ DataManager.process_dingk_Cooking_notetags = function(group) {
 		obj.ingredientValue = [];
 		obj.ingredientValueRequired = 0;
 		obj.cookRecipe = [];
+		obj.cookOptional = [];
 		obj.restrictEffect = false;
 		obj.ingredientRecover = [0, 0, 0];
 		obj.ingredientStateRemove = [];
@@ -205,20 +217,13 @@ DataManager.process_dingk_Cooking_notetags = function(group) {
 			} else if (notedata[i].match(note2)) {
 				obj.ingredientValueRequired += parseInt(RegExp.$1);
 			} else if (notedata[i].match(/<INGREDIENTS REQUIRED>/i)) {
-				mode = 'ingredient';
+				mode = 'required';
 			} else if (notedata[i].match(/<\/INGREDIENTS REQUIRED>/i)) {
 				mode = '';
-			} else if (mode === 'ingredient') {
-				if (notedata[i].match(/(.*)/i)) {
-					var key = RegExp.$1.toUpperCase().trim();
-					obj.cookRecipe[key] = 
-						(obj.cookRecipe[key] || 0) + 1;
-				} else if (notedata[i].match(/(.*):[ ](\d+)/i)) {
-					var key = RegExp.$1.toUpperCase().trim();
-					var val = parseInt(RegExp.$2);
-					obj.cookRecipe[key] = 
-						(obj.cookRecipe[key] || 0 ) + val;
-				}
+			} else if (notedata[i].match(/<INGREDIENTS OPTIONAL>/i)){
+				mode = 'optional';
+			} else if (notedata[i].match(/<\/INGREDIENTS OPTIONAL>/i)) {
+				mode = '';
 			} else if (notedata[i].match(/<RESTRICT EFFECT COPY>/i)) {
 				obj.restrictEffect = true;
 			} else if (notedata[i].match(notex1)) {
@@ -271,6 +276,20 @@ DataManager.process_dingk_Cooking_notetags = function(group) {
 					value2: 0
 				};
 				obj.ingredientStatBuff.push(effect);
+			} else if (mode === 'required') {
+				if (notedata[i].match(/(.*)/i)) {
+					var key = RegExp.$1.toUpperCase().trim();
+					obj.cookRecipe[key] = 
+						(obj.cookRecipe[key] || 0) + 1;
+				} else if (notedata[i].match(/(.*):[ ](\d+)/i)) {
+					var key = RegExp.$1.toUpperCase().trim();
+					var val = parseInt(RegExp.$2);
+					obj.cookRecipe[key] = 
+						(obj.cookRecipe[key] || 0 ) + val;
+				}
+			} else if (mode === 'optional') {
+				if (notedata[i].match(/(.*)/i))
+					obj.cookOptional.push(RegExp.$1.toUpperCase().trim());
 			}
 		}
 	}
@@ -361,7 +380,6 @@ Dingk_Cooking.prototype.start = function() {
 		if (!item) continue;
 		if (!Object.keys(item.cookRecipe).length) continue;
 		if (totalValue < item.ingredientValueRequired) continue;
-		console.log(cc);
 		for (var i in item.cookRecipe) {
 			console.log(categoryCount);
 			if (!categoryCount[i]) {
@@ -371,8 +389,13 @@ Dingk_Cooking.prototype.start = function() {
 				cc--;
 			}
 		}
-		console.log('RecipeMatch:', recipeMatch, cc);
-		if (cc)
+		if (cc > 0 && recipeMatch) {
+			for (var opt of item.cookOptional) {
+				if (Object.keys(categoryCount).contains(opt))
+					cc--;
+			}
+		}
+		if (cc > 0)
 			recipeMatch = false;
 		if (recipeMatch) {
 			if (item.ingredientValueRequired > prevMaxValue) {
@@ -383,7 +406,7 @@ Dingk_Cooking.prototype.start = function() {
 		}
 	}
 	if (Imported.YEP_ItemCore && 
-	    result && result.id !== dingk.Cooking.mistakeItemId) {
+		result && result.id !== dingk.Cooking.mistakeItemId) {
 		var newItem = DataManager.registerNewItem(result);
 		this.copyEffects(result, newItem);
 		result = newItem;
@@ -511,24 +534,24 @@ Window_Cooking.prototype = Object.create(Window_ItemList.prototype);
 Window_Cooking.prototype.constructor = Window_Cooking;
 
 Window_Cooking.prototype.initialize = function(messageWindow) {
-    this._messageWindow = messageWindow;
-    var width = Graphics.boxWidth;
-    var height = this.windowHeight();
-    Window_ItemList.prototype.initialize.call(this, 0, 0, width, height);
+	this._messageWindow = messageWindow;
+	var width = Graphics.boxWidth;
+	var height = this.windowHeight();
+	Window_ItemList.prototype.initialize.call(this, 0, 0, width, height);
 	this._ingredientList = [];
 	this._ingredientSelectCount = 0;
-    this.openness = 0;
-    this.deactivate();
-    this.setHandler('ok',     this.onOk.bind(this));
-    this.setHandler('cancel', this.onCancel.bind(this));
+	this.openness = 0;
+	this.deactivate();
+	this.setHandler('ok', this.onOk.bind(this));
+	this.setHandler('cancel', this.onCancel.bind(this));
 };
 
 Window_Cooking.prototype.windowHeight = function() {
-    return this.fittingHeight(this.numVisibleRows());
+	return this.fittingHeight(this.numVisibleRows());
 };
 
 Window_Cooking.prototype.numVisibleRows = function() {
-    return 4;
+	return 4;
 };
 
 Window_Cooking.prototype.includes = function(item) {
@@ -536,24 +559,24 @@ Window_Cooking.prototype.includes = function(item) {
 };
 
 Window_Cooking.prototype.updatePlacement = function() {
-    if (this._messageWindow.y >= Graphics.boxHeight / 2) {
-        this.y = 0;
-    } else {
-        this.y = Graphics.boxHeight - this.height;
-    }
+	if (this._messageWindow.y >= Graphics.boxHeight / 2) {
+		this.y = 0;
+	} else {
+		this.y = Graphics.boxHeight - this.height;
+	}
 };
 
 Window_Cooking.prototype.start = function() {
 	$dingkCooking._ingredientList = [];
-    this.refresh();
-    this.updatePlacement();
-    this.select(0);
-    this.open();
-    this.activate();
+	this.refresh();
+	this.updatePlacement();
+	this.select(0);
+	this.open();
+	this.activate();
 };
 
 Window_Cooking.prototype.isEnabled = function(item) {
-    return true;
+	return true;
 };
 
 Window_Cooking.prototype.onOk = function() {
@@ -590,7 +613,7 @@ Window_Message.prototype.createSubWindows = function() {
 
 dingk.Cooking.WM_startInput = Window_Message.prototype.startInput;
 Window_Message.prototype.startInput = function() {
-    if ($gameMessage.isCooking()) {
+	if ($gameMessage.isCooking()) {
 		this._cookingWindow.start();
 		return true;
 	} else {
