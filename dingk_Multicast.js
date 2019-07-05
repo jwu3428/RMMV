@@ -218,16 +218,19 @@ Window_BattleSkill.prototype.resetMulticast = function() {
 
 Window_BattleSkill.prototype.isEnabled = function(item) {
 	var actor = this._actor;
+	var result = actor && this._actor.canUse(item);
 	if (this._actor && this._isMulticast && DataManager.isSkill(item)) {
 		var canMulti = this._multicastSkills.contains(item.id);
 		var canPayTpCost = this._remainingTp >= actor.skillTpCost(item);
 		var canPayMpCost = this._remainingMp >= actor.skillMpCost(item);
+		result = result && canPayTpCost && canPayMpCost && canMulti;
 		if (Imported.YEP_SkillCore) {
 			var canPayHpCost = this._remainingHp >= actor.skillHpCost(item);
-			return actor.canUse(item) && canPayTpCost && canPayMpCost
-									  && canPayHpCost && canMulti;
+			result = result && canPayHpCost;
 		}
-		return actor.canUse(item) && canPayTpCost && canPayMpCost && canMulti;
+		if (Imported.YEP_X_SkillCostItems) {
+			
+		}
 	}
-	return actor && this._actor.canUse(item);
+	return result;
 };

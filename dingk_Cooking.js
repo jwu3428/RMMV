@@ -82,21 +82,21 @@ dingk.Cooking.version = 1.0;
  * -----------------------------------------------------------------------------
  *   Notetags
  * -----------------------------------------------------------------------------
- * <Ingredient string Value: +d>
- * <Ingredient string Value: -d>
+ * <Ingredient string Value: +a>
+ * <Ingredient string Value: -a>
  *  > Assign the item an ingredient category (string) and give it a value.
  *
- * <Ingredient Value Required: +d>
- * <Ingredient Value Required: -d>
+ * <Ingredient Value Required: +a>
+ * <Ingredient Value Required: -a>
  *  > Assign the resulting food a required value.
  *
  * <Ingredients Required>
- * string[: d]
- * string[: d]
+ * string[: a]
+ * string[: a]
  * ...
  * </Ingredients Required>
  *  > Define the recipe with 'string' being the ingredient category.
- *    (Optional: 'd' is the amount of items required.) 
+ *    (Optional: 'a' is the amount of items required.) 
  *
  * <Ingredients Optional>
  * string
@@ -113,26 +113,26 @@ dingk.Cooking.version = 1.0;
  *  > By default, effects of the ingredients will copy over to the result. 
  *    Use this notetag to ignore any ingredient effects and define your own.
  * 
- * <Ingredient stat Recover: d>
+ * <Ingredient stat Recover: a>
  *  > Replace stat with HP, MP, or TP. When using this ingredient, the result 
- *    will recover 'd' amount of HP/MP/TP when consumed.
+ *    will recover 'a' amount of HP/MP/TP when consumed.
  *
- * <Ingredient State Clear: d[, d, ...]>
- *  > When using this ingredient, the result will clear State IDs 'd' when 
- *    consumed.
+ * <Ingredient State Clear: a[, b, c ...]>
+ *  > When using this ingredient, the result will clear the specified State IDs  
+ *    when consumed.
  *
  * <Ingredient State Category Clear: string>
- * <Ingredient d State Category Clear: string>
+ * <Ingredient a State Category Clear: string>
  *  > Requires YEP_X_StateCategories.js. If you are using this plugin, you can 
- *    remove all or 'd' number of states with category 'string'.
+ *    remove all or 'a' number of states with category 'string'.
  *
- * <Ingredient State Add: d[, d, ...]>
- *  > When using this ingredient, the result will add State IDs 'd' when 
- *    consumed.
+ * <Ingredient State Add: a[, b, ...]>
+ *  > When using this ingredient, the result will add the specified State IDs  
+ *    when consumed.
  *
- * <Ingredient stat Buff Add: d>
+ * <Ingredient stat Buff Add: a>
  *  > Replace 'stat' with HP, MP, ATK, DEF, MAT, MDF, AGI, or LUK. When using 
- *    this ingredient, the result will add a buff for 'd' turns when consumed.
+ *    this ingredient, the result will add a buff for 'a' turns when consumed.
  *    Add multiples of this notetag if you want multiple stacks of buffs.
  *
  * -----------------------------------------------------------------------------
