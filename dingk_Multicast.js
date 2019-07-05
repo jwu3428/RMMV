@@ -1,12 +1,16 @@
+/*******************************************************************************
+ * Multicast v1.0 by dingk
+ * For use in RMMV 1.6.2
+ ******************************************************************************/
+
 var Imported = Imported || {};
 Imported.dingk_Multicast = true;
 
 var dingk = dingk || {};
 dingk.Multicast = dingk.Multicast || {};
-dingk.Multicast.version = 1.0;
 
 /*:
- * @plugindesc Allows an actor to select and perform multiple skills at once.
+ * @plugindesc [1.0] Allows an actor to select and perform multiple skills at once.
  * @author dingk
  *
  * @help
@@ -22,6 +26,7 @@ dingk.Multicast.version = 1.0;
  *   Notetags
  * -----------------------------------------------------------------------------
  * Skill Notetags:
+ *
  * <Multicast x: y, y ... >
  * <Multicast x: y to z>
  * Set this skill to activate multicast.
@@ -34,13 +39,15 @@ dingk.Multicast.version = 1.0;
  * -----------------------------------------------------------------------------
  *   Compatibility
  * -----------------------------------------------------------------------------
- * This plugin was only made compatible with YEP_SkillCore.
+ * Compatible with most other plugins. This plugin has additional functionality 
+ * with YEP_SkillCore.
  *
  * -----------------------------------------------------------------------------
  *   Terms of Use
  * -----------------------------------------------------------------------------
  *  > Can be used in free or commercial games.
  *  > Credit to me 'dingk' will be greatly appreciated.
+ *  > Feel free to edit to suit your needs.
  */
 
 //------------------------------------------------------------------------------
@@ -122,6 +129,7 @@ Scene_Battle.prototype.onSkillOk = function() {
 	var action = BattleManager.inputtingAction();
 	
 	if (skill.multicastCount && !this._skillWindow._isMulticast) {
+		actor._isMulticast = true;
 		this._skillWindow._isMulticast = true;
 		this._skillWindow._multicastCount = skill.multicastCount - 1;
 		this._skillWindow._multicastSkills = skill.multicastSkills;
@@ -153,6 +161,15 @@ Scene_Battle.prototype.onSkillOk = function() {
 	}
 };
 
+dingk.Multicast.SB_startActorCommandSelection = 
+	Scene_Battle.prototype.startActorCommandSelection;
+Scene_Battle.prototype.startActorCommandSelection = function() {
+	dingk.Multicast.SB_startActorCommandSelection.call(this);
+	if (BattleManager.actor()._isMulticast)
+		BattleManager.actor().makeActions();
+	BattleManager.actor()._isMulticast = false;
+};
+
 dingk.Multicast.SB_selectNextCommand = Scene_Battle.prototype.selectNextCommand;
 Scene_Battle.prototype.selectNextCommand = function() {
 	if (this._skillWindow._isMulticast) {
@@ -172,6 +189,7 @@ Scene_Battle.prototype.onSkillCancel = function() {
 		this._skillWindow.resetMulticast();
 		this.resetMulticast();
 	}
+	BattleManager.actor()._isMulticast = false;
 	dingk.Multicast.SB_onSkillCancel.call(this);
 };
 
