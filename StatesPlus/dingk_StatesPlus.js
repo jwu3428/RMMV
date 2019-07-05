@@ -1,5 +1,5 @@
 /*******************************************************************************
- * States Plus v0.1 by dingk
+ * States Plus v0.2 by dingk
  * For use in RMMV 1.6.2
  ******************************************************************************/
 
@@ -10,9 +10,37 @@ var dingk = dingk || {};
 dingk.StatesPlus = dingk.StatesPlus || {};
 
 /*:
- * @plugindesc [0.1] Allows another state to be applied if the state you are applying 
+ * @plugindesc [v0.2] Allows another state to be applied if the state you are applying 
  * already exists. IMPORTANT: PLACE ABOVE ALL PLUGINS FOR MAX COMPATIBILITY.
  * @author dingk
+ *
+ * @param Stack Counter Settings
+ *
+ * @param Text Color
+ * @parent Stack Counter Settings
+ * @desc Color of the stack counter in hex
+ * @default #ffffff
+ *
+ * @param Alignment
+ * @parent Stack Counter Settings
+ * @desc Alignment of the stack counter (
+ * @type select
+ * @option left
+ * @option center
+ * @option right
+ * @default right
+ *
+ * @param X Offset
+ * @parent Stack Counter Settings
+ * @desc Offset the horizontal position of the stack counter
+ * @type number
+ * @default 0
+ *
+ * @param Y Offset
+ * @parent Stack Counter Settings
+ * @desc Offset the vertical position of the stack counter
+ * @type number
+ * @default 6
  *
  * @help
  * !!! IMPORTANT !!!
@@ -53,6 +81,12 @@ dingk.StatesPlus = dingk.StatesPlus || {};
  * -----------------------------------------------------------------------------
  *  > Free and commercial use and redistribution (under MIT License).
  */
+ 
+dingk.StatesPlus.params = PluginManager.parameters('dingk_StatesPlus');
+dingk.StatesPlus.stackTextColor = dingk.StatesPlus.params['Text Color'] || '#ffffff';
+dingk.StatesPlus.stackAlignment = dingk.StatesPlus.params['Alignment'] || 'right';
+dingk.StatesPlus.stackOffsetX = Number(dingk.StatesPlus.params['X Offset']) || 0;
+dingk.StatesPlus.stackOffsetY = Number(dingk.StatesPlus.params['Y Offset']) || 6;
 
 dingk.StatesPlus.DataManager_isDatabaseLoaded = DataManager.isDatabaseLoaded;
 DataManager.isDatabaseLoaded = function () {
@@ -270,10 +304,13 @@ Sprite_StateIcon.prototype.drawStateStacks = function(state) {
 	if (stacks <= 1) return;
 	var w = Window_Base._iconWidth;
 	var h = Window_Base.prototype.lineHeight.call(this);
+	var dx = dingk.StatesPlus.stackOffsetX;
+	var dy = dingk.StatesPlus.stackOffsetY;
+	var align = dingk.StatesPlus.stackAlignment;
 	var bitmap = this._stackCounterSprite.bitmap;
 	bitmap.fontSize = 16;
-	bitmap.textColor = '#ffe0b2';
-	bitmap.drawText('\u00d7' + stacks, 0, 10, w, h, 'right');
+	bitmap.textColor = dingk.StatesPlus.stackTextColor;
+	bitmap.drawText('\u00d7' + stacks, dx, dy, w, h, align);
 };
 
 //------------------------------------------------------------------------------
@@ -302,9 +339,13 @@ Window_Base.prototype.drawActorIcons = function(actor, wx, wy, ww) {
 Window_Base.prototype.drawStateStacks = function(actor, state, wx, wy) {
 	var stacks = actor._stateStacks[state.id];
 	if (!stacks || stacks <= 1) return;
+	var dx = dingk.StatesPlus.stackOffsetX;
+	var dy = dingk.StatesPlus.stackOffsetY;
+	var iw = Window_Base._icon_width;
+	var align = dingk.StatesPlus.stackAlignment;
 	this.changePaintOpacity(true);
 	this.contents.fontSize = 16;
-	this.changeTextColor('#ffe0b2');
-	this.drawText('\u00d7' + stacks, wx, wy + 10, Window_Base._iconWidth, 'right');
+	this.changeTextColor(dingk.StatesPlus.stackTextColor);
+	this.drawText('\u00d7' + stacks, wx + dx, wy + dy, iw, align);
 	this.resetFontSettings();
 };
