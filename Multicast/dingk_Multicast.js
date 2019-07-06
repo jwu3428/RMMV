@@ -63,8 +63,9 @@ dingk.Multicast = dingk.Multicast || {};
  * -----------------------------------------------------------------------------
  *   Compatibility
  * -----------------------------------------------------------------------------
- * Compatible with most other plugins. This plugin has additional functionality 
- * with YEP_SkillCore.
+ * Won't work with plugins that allow custom skill costs.
+ * Works with YEP_SkillCore
+ * Only works with default battle system (doesn't work with ATB or STB).
  *
  * -----------------------------------------------------------------------------
  *   Terms of Use
