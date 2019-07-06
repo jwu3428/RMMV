@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Multicast v1.0 by dingk
+ * Multicast v1.1 by dingk
  * For use in RMMV 1.6.2
  ******************************************************************************/
 
@@ -10,8 +10,16 @@ var dingk = dingk || {};
 dingk.Multicast = dingk.Multicast || {};
 
 /*:
- * @plugindesc [1.0] Allows an actor to select and perform multiple skills at once.
+ * @plugindesc [1.1] Allows an actor to select and perform multiple skills at once.
  * @author dingk
+ *
+ * @param Multicast Type
+ * @desc Determines the default multicast type (see Help for more information)
+ * @type select
+ * @option 0
+ * @option 1
+ * @option 2
+ * @default 0
  *
  * @help
  * -----------------------------------------------------------------------------
@@ -21,6 +29,18 @@ dingk.Multicast = dingk.Multicast || {};
  * How this works is that the player selects the Multicast skill to enable 
  * multicasting. Then in the same window, the player can select multiple skills 
  * to cast provided that they still meet the skill costs.
+ *
+ * -----------------------------------------------------------------------------
+ *   Plugin Parameters
+ * -----------------------------------------------------------------------------
+ * Multicast Type
+ *  > Determines the default multicast type that is applied to all Multicast 
+ *    skills.
+ *  > 0 - Select and cast multiple skills at once.
+ *  > 1 - Select only one skill, casts it multiple times, each with its 
+ *        own target selection.
+ *  > 2 - Select only one skill, casts it multiple times, but cannot select 
+ *        different targets.
  * 
  * -----------------------------------------------------------------------------
  *   Notetags
@@ -35,6 +55,10 @@ dingk.Multicast = dingk.Multicast || {};
  *   > Example: <Multicast 2: 10 to 14>
  *     On choosing this skill, the player can select two more skills with IDs 
  *     10, 11, 12, 13, or 14.
+ *
+ * <Multicast Type: x>
+ * Set this skill to be a certain multicast type. See Plugin Parameters for more
+ * information.
  * 
  * -----------------------------------------------------------------------------
  *   Compatibility
@@ -45,10 +69,20 @@ dingk.Multicast = dingk.Multicast || {};
  * -----------------------------------------------------------------------------
  *   Terms of Use
  * -----------------------------------------------------------------------------
- *  > Can be used in free or commercial games.
- *  > Credit to me 'dingk' will be greatly appreciated.
- *  > Feel free to edit to suit your needs.
+ *  > Free and commercial use and redistribution (under MIT License).
+ *
+ * -----------------------------------------------------------------------------
+ *   Changelog
+ * -----------------------------------------------------------------------------
+ * v1.1
+ *  - New feature: Different Multicast types
+ *
+ * v1.0
+ *  - Initial release
  */
+
+dingk.Multicast.params = PluginManager.parameters('dingk_Multicast');
+dingk.Multicast.defaultType = Number(dingk.Multicast.params['Multicast Type']) || 0;
 
 //------------------------------------------------------------------------------
 // DataManager
@@ -68,12 +102,14 @@ DataManager.process_dingk_Multicast_skills = function() {
 	var group = $dataSkills;
 	var note1 = /<MULTICAST (\d+): (\d+(\s*,\s*\d+)*)>/i;
 	var note2 = /<MULTICAST (\d+): (\d+) TO (\d+)>/i;
+	var note3 = /<MULTICAST TYPE: (\d+)>/i;
 	for (var n = 1; n < group.length; n++) {
 		var obj = group[n];
 		var notedata = obj.note.split(/[\r\n]+/);
 		var mode = '';
 		obj.multicastCount = 0;
 		obj.multicastSkills = [];
+		obj.multicastType = dingk.Multicast.defaultType;
 		
 		for (var i = 0; i < notedata.length; i++) {
 			if (notedata[i].match(note1)) {
@@ -87,6 +123,8 @@ DataManager.process_dingk_Multicast_skills = function() {
 				var skills = 
 					[...Array(end - start + 1).keys()].map(a => a + start);
 				obj.multicastSkills = obj.multicastSkills.concat(skills);
+			} else if (notedata[i].match(note3)) {
+				obj.multicastType = parseInt(RegExp.$1);
 			}
 		}
 	}
@@ -133,6 +171,7 @@ Scene_Battle.prototype.onSkillOk = function() {
 		this._skillWindow._isMulticast = true;
 		this._skillWindow._multicastCount = skill.multicastCount - 1;
 		this._skillWindow._multicastSkills = skill.multicastSkills;
+		this._skillWindow._multicastType = skill.multicastType;
 		
 		this._skillWindow._remainingHp = actor._hp;
 		this._skillWindow._remainingMp = actor._mp;
@@ -147,17 +186,24 @@ Scene_Battle.prototype.onSkillOk = function() {
 		this._skillWindow.refresh();
 		this._skillWindow.activate();
 	} else if (this._skillWindow._isMulticast) {
-		action.setSkill(skill.id);
-		actor.setLastBattleSkill(skill);
-		if (this._skillWindow._multicastCount > 0)
-			this._skillWindow._multicastCount--;
-		else {
-			this._skillWindow._isMulticast = false;
-		}
-		
+		this.processMulticast();
 		this.onSelectAction();
 	} else {
 		dingk.Multicast.SB_onSkillOk.call(this);
+	}
+};
+
+Scene_Battle.prototype.processMulticast = function() {
+	var skill = this._skillWindow.item();
+	var actor = BattleManager.actor();
+	var action = BattleManager.inputtingAction();
+	
+	action.setSkill(skill.id);
+	actor.setLastBattleSkill(skill);
+	if (this._skillWindow._multicastCount > 0)
+		this._skillWindow._multicastCount--;
+	else {
+		this._skillWindow._isMulticast = false;
 	}
 };
 
@@ -173,11 +219,28 @@ Scene_Battle.prototype.startActorCommandSelection = function() {
 dingk.Multicast.SB_selectNextCommand = Scene_Battle.prototype.selectNextCommand;
 Scene_Battle.prototype.selectNextCommand = function() {
 	if (this._skillWindow._isMulticast) {
-		this._helpWindow.clear();
-		this._skillWindow.show();
-		this._skillWindow.activate();
-		this._skillWindow.refresh();
-		BattleManager.selectNextCommand();
+		if (this._skillWindow._multicastType === 1) {
+			BattleManager.selectNextCommand();
+			this.processMulticast();
+			this.onSelectAction();
+		} else if (this._skillWindow._multicastType === 2) {
+			BattleManager.selectNextCommand();
+			var action = BattleManager.inputtingAction();
+			this.processMulticast();
+			if (!action.needsSelection()) {
+				this.selectNextCommand();
+			} else if (action.isForOpponent()) {
+				this.onEnemyOk();
+			} else {
+				this.onActorOk();
+			}
+		} else {
+			this._helpWindow.clear();
+			this._skillWindow.show();
+			this._skillWindow.activate();
+			this._skillWindow.refresh();
+			BattleManager.selectNextCommand();
+		}
 	} else {
 		dingk.Multicast.SB_selectNextCommand.call(this);
 	}
@@ -211,6 +274,7 @@ Window_BattleSkill.prototype.resetMulticast = function() {
 	this._isMulticast = false;
 	this._multicastCount = 0;
 	this._multicastSkills = [];
+	this._multicastType = dingk.Multicast.defaultType;
 	this._remainingHp = 0;
 	this._remainingMp = 0;
 	this._remainingTp = 0;
