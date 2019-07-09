@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Animation Variance v0.2 by dingk
+ * Animation Variance v0.2.1 by dingk
  * For use in RMMV 1.6.2
  ******************************************************************************/
 
@@ -10,7 +10,7 @@ var dingk = dingk || {};
 dingk.AV = dingk.AV || {};
 
 /*:
- * @plugindesc [v0.2] Allow slight variations in battle animations.
+ * @plugindesc [v0.2.1] Allow slight variations in battle animations.
  * @author dingk
  *
  * @help
@@ -122,6 +122,9 @@ dingk.AV = dingk.AV || {};
  * -----------------------------------------------------------------------------
  *   Changelog
  * -----------------------------------------------------------------------------
+ * v0.2.1
+ *  - Fixed a bug that caused an animation executed by the enemy to come flying 
+ *    offscreen when using screen animation movement.
  * v0.2
  *  - New feature: Custom movement formulas
  *  - New animation movement properties: Screen X / Y
@@ -403,7 +406,7 @@ Sprite_Animation.prototype.updateCellSprite = function(sprite, cell) {
             sprite.scale.x *= -1;
         }
         if(mirror){
-            sprite.x *= -1;
+            if (!this.aniScrX) sprite.x *= -1;
             sprite.rotation *= -1;
             sprite.scale.x *= -1;
         }
@@ -511,6 +514,8 @@ Sprite_Animation.prototype.formulaEval = function(formula) {
 Sprite_Animation.prototype.screenEval = function(formula) {
 	var a = this._subject;
 	var b = this._target;
+	if (b.parent instanceof Sprite_Actor)
+		b = b.parent;
 	var ax = -1, ay = -1;
 	if (a) {
 		var ax = this._subject.x;
