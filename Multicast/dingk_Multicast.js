@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Multicast v1.1 by dingk
+ * Multicast v1.1.1 by dingk
  * For use in RMMV 1.6.2
  ******************************************************************************/
 
@@ -10,7 +10,7 @@ var dingk = dingk || {};
 dingk.Multicast = dingk.Multicast || {};
 
 /*:
- * @plugindesc [1.1] Allows an actor to select and perform multiple skills at once.
+ * @plugindesc [v1.1.1] Allows an actor to select and perform multiple skills at once.
  * @author dingk
  *
  * @param Multicast Type
@@ -65,7 +65,9 @@ dingk.Multicast = dingk.Multicast || {};
  * -----------------------------------------------------------------------------
  * Won't work with plugins that allow custom skill costs.
  * Works with YEP_SkillCore
- * Only works with default battle system (doesn't work with ATB or STB).
+ * Only works with battle systems that allow multiple actions per turn. This 
+ * includes Yanfly's ATB, CTB, and STB, and Moghunter's ATB. Compatible with 
+ * Victor's ATB.
  *
  * -----------------------------------------------------------------------------
  *   Terms of Use
@@ -75,10 +77,16 @@ dingk.Multicast = dingk.Multicast || {};
  * -----------------------------------------------------------------------------
  *   Changelog
  * -----------------------------------------------------------------------------
- * v1.1
+ * v1.1.1 - Bug fix
+ *  - Fixed a bug that failed to properly reset an actor's action when canceling
+ *    a multicast.
+ *  - Canceling multicast now refreshes the skill window rather than going back 
+ *    to the actor command window.
+ *
+ * v1.1 - Feature update
  *  - New feature: Different Multicast types
  *
- * v1.0
+ * v1.0 - Initial
  *  - Initial release
  */
 
@@ -183,29 +191,32 @@ Scene_Battle.prototype.onSkillOk = function() {
 			actor._actions.push(
 				new Game_Action(actor));
 		}
-		
+		actor.setLastBattleSkill(skill);
 		this._skillWindow.refresh();
 		this._skillWindow.activate();
 	} else if (this._skillWindow._isMulticast) {
-		this.processMulticast();
+		action.setSkill(skill.id);
+		actor.setLastBattleSkill(skill);
 		this.onSelectAction();
 	} else {
 		dingk.Multicast.SB_onSkillOk.call(this);
 	}
 };
 
-Scene_Battle.prototype.processMulticast = function() {
-	var skill = this._skillWindow.item();
-	var actor = BattleManager.actor();
-	var action = BattleManager.inputtingAction();
-	
-	action.setSkill(skill.id);
-	actor.setLastBattleSkill(skill);
-	if (this._skillWindow._multicastCount > 0)
-		this._skillWindow._multicastCount--;
-	else {
-		this._skillWindow._isMulticast = false;
-	}
+dingk.Multicast.SB_onActorCancel = Scene_Battle.prototype.onActorCancel;
+Scene_Battle.prototype.onActorCancel = function() {
+	this._skillWindow.resetMulticast();
+	BattleManager.actor().resetMulticast();
+	dingk.Multicast.SB_onActorCancel.call(this);
+	this._skillWindow.refresh();
+};
+
+dingk.Multicast.SB_onEnemyCancel = Scene_Battle.prototype.onEnemyCancel;
+Scene_Battle.prototype.onEnemyCancel = function() {
+	this._skillWindow.resetMulticast();
+	BattleManager.actor().resetMulticast();
+	dingk.Multicast.SB_onEnemyCancel.call(this);
+	this._skillWindow.refresh();
 };
 
 dingk.Multicast.SB_startActorCommandSelection = 
@@ -219,15 +230,28 @@ Scene_Battle.prototype.startActorCommandSelection = function() {
 
 dingk.Multicast.SB_selectNextCommand = Scene_Battle.prototype.selectNextCommand;
 Scene_Battle.prototype.selectNextCommand = function() {
+	
+	if (this._skillWindow._multicastCount > 0)
+		this._skillWindow._multicastCount--;
+	else {
+		this._skillWindow._isMulticast = false;
+	}
 	if (this._skillWindow._isMulticast) {
 		if (this._skillWindow._multicastType === 1) {
 			BattleManager.selectNextCommand();
-			this.processMulticast();
+			var skill = this._skillWindow.item();
+			var actor = BattleManager.actor();
+			var action = BattleManager.inputtingAction();
+			action.setSkill(skill.id);
+			actor.setLastBattleSkill(skill);
 			this.onSelectAction();
 		} else if (this._skillWindow._multicastType === 2) {
 			BattleManager.selectNextCommand();
+			var skill = this._skillWindow.item();
+			var actor = BattleManager.actor();
 			var action = BattleManager.inputtingAction();
-			this.processMulticast();
+			action.setSkill(skill.id);
+			actor.setLastBattleSkill(skill);
 			if (!action.needsSelection()) {
 				this.selectNextCommand();
 			} else if (action.isForOpponent()) {
@@ -251,14 +275,25 @@ dingk.Multicast.SB_onSkillCancel = Scene_Battle.prototype.onSkillCancel;
 Scene_Battle.prototype.onSkillCancel = function() {
 	if (this._skillWindow._isMulticast) {
 		this._skillWindow.resetMulticast();
-		this.resetMulticast();
+		this._skillWindow.show();
+		this._skillWindow.activate();
+		this._skillWindow.refresh();
+		BattleManager.actor().resetMulticast();
+	} else {
+		dingk.Multicast.SB_onSkillCancel.call(this);
 	}
-	BattleManager.actor()._isMulticast = false;
-	dingk.Multicast.SB_onSkillCancel.call(this);
 };
 
-Scene_Battle.prototype.resetMulticast = function() {
-	BattleManager.actor().makeActions();
+Game_Battler.prototype.resetMulticast = function() {
+	this.clearActions();
+	if (this.canMove()) {
+		var actionTimes = this.makeActionTimes();
+		this._actions = [];
+		for (var i = 0; i < actionTimes; i++) {
+			this._actions.push(new Game_Action(this));
+		}
+	}
+	this._isMulticast = false;
 };
 
 //------------------------------------------------------------------------------
