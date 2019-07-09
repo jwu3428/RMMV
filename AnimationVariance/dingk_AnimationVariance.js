@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Animation Variance v0.1 by dingk
+ * Animation Variance v0.2 by dingk
  * For use in RMMV 1.6.2
  ******************************************************************************/
 
@@ -10,7 +10,7 @@ var dingk = dingk || {};
 dingk.AV = dingk.AV || {};
 
 /*:
- * @plugindesc [v0.1] Allow slight variations in battle animations.
+ * @plugindesc [v0.2] Allow slight variations in battle animations.
  * @author dingk
  *
  * @help
@@ -37,9 +37,11 @@ dingk.AV = dingk.AV || {};
  * position X: a to b
  * position Y: a to b
  * </Action Animation Variance>
- *  > Make the assigned skill animation vary with rotation and position. Set the 
- *    rotation to vary from range 'a' to 'b' in degrees, positions from 'a' to
- *    'b'. Each property is optional.
+ *  > Make the assigned skill animation vary with rotation and position with 
+ *    respect to the target's position. Each property is optional.
+ *  > ROTATION - randomize the rotation from 'a' to 'b' in degrees.
+ *  > POSITION X - randomize the horizontal position from 'a' to 'b' in pixels
+ *  > POSITION Y - randomize the vertical position from 'a' to 'b' in pixels
  *
  * <Animation a Variance>
  * ...
@@ -49,11 +51,23 @@ dingk.AV = dingk.AV || {};
  *    animation ID. Same setup as above.
  *
  * <Action Animation Move[: a]>
- * ...
+ * rotation: a to b
+ * position X: a to b
+ * position Y: a to b
+ * screen X: a to b
+ * screen Y: a to b
  * </Action Animation Move>
  *  > Make the assigned skill animation move with respect to the target's 
  *    position. You can optionally set 'a' number of animation frames that the 
  *    animation will move. Otherwise, it will move for the entire animation.
+ *  > ROTATION - Rotate from 'a' to 'b' in degrees.
+ *  > POSITION X / POSITION Y - Move from point 'a' to 'b' in pixels, relative 
+ *    to the target's position.
+ *  > SCREEN X / SCREEN Y - Move from point 'a' to 'b' in pixels anywhere on 
+ *    the screen.
+ *     - Accepts Javascript code. Available variables are 'a' which is the user, 
+ *       and 'b' which is the target. For example you can grab their positions, 
+ *       using variables 'a.x', 'a.y', etc.
  *  > Example: <Action Animation Move>
  *             position X: 0 to -200
  *             </Action Animation Move>
@@ -67,7 +81,54 @@ dingk.AV = dingk.AV || {};
  *    animation ID. Same setup as above.
  *
  * -----------------------------------------------------------------------------
- *   
+ *   Advanced Notetags
+ * -----------------------------------------------------------------------------
+ * In the above notetags, you can define custom formulas for the movement path 
+ * of the animation. The format is:
+ *
+ * <Action Animation Move>
+ * property: formula from a to b
+ * </Action Animation Move>
+ *  > The animation will move using the formula, moving from 'a' to 'b'. 
+ *    Use the variable 'n' to denote the current animation frame.
+ *
+ *   Example:
+ *     <Action Animation Move>
+ *     position X: Math.pow(n, 3) from 0 to 100
+ *     </Action Animation Move>
+ *       > The animation will move from slow to fast with this exponential 
+ *         function.
+ *       > NOTE: Do not use complex functions that have bounds like sine or 
+ *         logarithmic functions. For this, refer to the following.
+ *
+ * <Action Animation Move>
+ * position X: advancedFormula
+ * </Action Animation Move>
+ *  > If you don't want to be constrained to some bound or want to use functions
+ *    like sine, use this notetag (which is just the above notetag without "from
+ *    a to b." Again, use 'n' to denote the current animation frame.
+ *
+ * -----------------------------------------------------------------------------
+ *   Compatibility
+ * -----------------------------------------------------------------------------
+ * Did not test for compatibility, use at your own risk.
+ * Compatible with YEP_BattleEngineCore.
+ *
+ * -----------------------------------------------------------------------------
+ *   Terms of Use
+ * -----------------------------------------------------------------------------
+ *  > Free and commercial use and redistribution (under MIT License).
+ *
+ * -----------------------------------------------------------------------------
+ *   Changelog
+ * -----------------------------------------------------------------------------
+ * v0.2
+ *  - New feature: Custom movement formulas
+ *  - New animation movement properties: Screen X / Y
+ *  - Fixed a bug that crashes the game when executing an action with no 
+ *    animation
+ * v0.1
+ *  - Development test release
  */
 
 //------------------------------------------------------------------------------
@@ -79,16 +140,27 @@ class AnimationVariance {
 		this.rotation = rotation;
 		this.positionX = positionX;
 		this.positionY = positionY;
+		this.subject = null;
 	}
 };
 
 class AnimationMove {
 	constructor(rotation = [0, 0], positionX = [0, 0], positionY = [0, 0],
-				frames = 0) {
+				screenX = [-1, -1], screenY = [-1, -1], frames = 0) {
 		this.rotation = rotation;
 		this.positionX = positionX;
 		this.positionY = positionY;
+		this.screenX = screenX;
+		this.screenY = screenY;
+		this.screenOverrideX = false;
+		this.screenOverrideY = false;
 		this.frames = frames;
+		this.RFormula = 'n';
+		this.XFormula = 'n';
+		this.YFormula = 'n';
+		this.SXFormula = 'n';
+		this.SYFormula = 'n';
+		this.subject = null;
 	}
 };
 
@@ -103,6 +175,8 @@ dingk.AV.DataManager_isDatabaseLoaded = DataManager.isDatabaseLoaded;
 DataManager.isDatabaseLoaded = function() {
 	if (!dingk.AV.DataManager_isDatabaseLoaded.call(this)) return false;
 	if (!dingk.AV._loaded) {
+		dingk.AV.AnimVariance = [...Array($dataAnimations.length).fill(new AnimationVariance())];;
+		dingk.AV.AnimMove = [...Array($dataAnimations.length).fill(new AnimationMove())];;
 		this.process_dingk_AV_notetags($dataItems);
 		this.process_dingk_AV_notetags($dataSkills);
 		dingk.AV._loaded = true;
@@ -128,8 +202,8 @@ DataManager.process_dingk_AV_notetags = function(group) {
 		var mode = '';
 		var aniId = 0;
 		
-		obj.animationVariance = [];
-		obj.animationMove = [];
+		obj.animationVariance = [...Array($dataAnimations.length).fill(new AnimationVariance())];
+		obj.animationMove = [...Array($dataAnimations.length).fill(new AnimationMove())];
 		
 		for (var i = 0; i < notedata.length; i++) {
 			if (notedata[i].match(note1a)) {
@@ -165,42 +239,97 @@ DataManager.process_dingk_AV_notetags = function(group) {
 				if (notedata[i].match(/ROTATION: (-?\d+) to (-?\d+)/i)) {
 					var r1 = Number(RegExp.$1);
 					var r2 = Number(RegExp.$2);
-					obj.animationVariance[aniId].rotation = 
-						JSON.parse('[' + r1 + ',' + r2 + ']');
+					obj.animationVariance[aniId].rotation = [r1, r2];
 				} else if (notedata[i].match(/POSITION X: (-?\d+) to (-?\d+)/i)) {
 					var r1 = Number(RegExp.$1);
 					var r2 = Number(RegExp.$2);
-					obj.animationVariance[aniId].positionX = 
-						JSON.parse('[' + r1 + ',' + r2 + ']');
+					obj.animationVariance[aniId].positionX = [r1, r2];
 				} else if (notedata[i].match(/POSITION Y: (-?\d+) to (-?\d+)/i)) {
 					var r1 = Number(RegExp.$1);
 					var r2 = Number(RegExp.$2);
-					obj.animationVariance[aniId].positionY = 
-						JSON.parse('[' + r1 + ',' + r2 + ']');
+					obj.animationVariance[aniId].positionY = [r1, r2];
 				}
 			} else if (mode === 'move') {
 				if (notedata[i].match(/ROTATION: (-?\d+) to (-?\d+)/i)) {
 					var r1 = Number(RegExp.$1);
 					var r2 = Number(RegExp.$2);
-					obj.animationMove[aniId].rotation = 
-						JSON.parse('[' + r1 + ',' + r2 + ']');
+					obj.animationMove[aniId].rotation = [r1, r2];
 				} else if (notedata[i].match(/POSITION X: (-?\d+) to (-?\d+)/i)) {
 					var r1 = Number(RegExp.$1);
 					var r2 = Number(RegExp.$2);
-					obj.animationMove[aniId].positionX = 
-						JSON.parse('[' + r1 + ',' + r2 + ']');
+					obj.animationMove[aniId].positionX = [r1, r2];
 				} else if (notedata[i].match(/POSITION Y: (-?\d+) to (-?\d+)/i)) {
 					var r1 = Number(RegExp.$1);
 					var r2 = Number(RegExp.$2);
-					obj.animationMove[aniId].positionY = 
-						JSON.parse('[' + r1 + ',' + r2 + ']');
+					obj.animationMove[aniId].positionY = [r1, r2];
+				} else if (notedata[i].match(/SCREEN X: (.*) to (.*)/i)) {
+					var r1 = RegExp.$1.trim();
+					var r2 = RegExp.$2.trim();
+					obj.animationMove[aniId].screenX = [r1, r2];
+					obj.animationMove[aniId].screenOverrideX = true;
+				} else if (notedata[i].match(/SCREEN Y: (.*) to (.*)/i)) {
+					var r1 = RegExp.$1.trim();
+					var r2 = RegExp.$2.trim();
+					obj.animationMove[aniId].screenY = [r1, r2];
+					obj.animationMove[aniId].screenOverrideY = true;
+				} else if (notedata[i].match(/ROTATION: (.*) from (\d+) to (\d+)/i)) {
+					var f = RegExp.$1.trim();
+					var r1 = Number(RegExp.$2);
+					var r2 = Number(RegExp.$3);
+					obj.animationMove[aniId].rotation = [r1, r2];
+					obj.animationMove[aniId].RFormula = f;
+				} else if (notedata[i].match(/POSITION X: (.*) from (\d+) to (\d+)/i)) {
+					var f = RegExp.$1.trim();
+					var r1 = Number(RegExp.$2);
+					var r2 = Number(RegExp.$3);
+					obj.animationMove[aniId].positionX = [r1, r2];
+					obj.animationMove[aniId].XFormula = f;
+				} else if (notedata[i].match(/POSITION Y: (.*) from (\d+) to (\d+)/i)) {
+					var f = RegExp.$1.trim();
+					var r1 = Number(RegExp.$2);
+					var r2 = Number(RegExp.$3);
+					obj.animationMove[aniId].positionY = [r1, r2];
+					obj.animationMove[aniId].YFormula = f;
+				} else if (notedata[i].match(/SCREEN X: (.*) from (.*) to (.*)/i)) {
+					var f = RegExp.$1.trim();
+					var r1 = RegExp.$2.trim();
+					var r2 = RegExp.$3.trim();
+					obj.animationMove[aniId].screenX = [r1, r2];
+					obj.animationMove[aniId].SXFormula = f;
+					obj.animationMove[aniId].screenOverrideX = true;
+				} else if (notedata[i].match(/SCREEN Y: (.*) from (.*) to (.*)/i)) {
+					var f = RegExp.$1.trim();
+					var r1 = RegExp.$2.trim();
+					var r2 = RegExp.$3.trim();
+					obj.animationMove[aniId].positionY = [r1, r2];
+					obj.animationMove[aniId].SYFormula = f;
+					obj.animationMove[aniId].screenOverrideY = true;
+				} else if (notedata[i].match(/ROTATION: (.*)/i)) {
+					var f = RegExp.$1.trim();
+					obj.animationMove[aniId].RFormula = f;
+				} else if (notedata[i].match(/POSITION X: (.*)/i)) {
+					var f = RegExp.$1.trim();
+					obj.animationMove[aniId].XFormula = f;
+				} else if (notedata[i].match(/POSITION Y: (.*)/i)) {
+					var f = RegExp.$1.trim();
+					obj.animationMove[aniId].YFormula = f;
+				} else if (notedata[i].match(/SCREEN X: (.*)/i)) {
+					var f = RegExp.$1.trim();
+					obj.animationMove[aniId].screenX = [0, 0];
+					obj.animationMove[aniId].SXFormula = f;
+					obj.animationMove[aniId].screenOverrideX = true;
+				} else if (notedata[i].match(/SCREEN Y: (.*)/i)) {
+					var f = RegExp.$1.trim();
+					obj.animationMove[aniId].screenY = [0, 0];
+					obj.animationMove[aniId].SYFormula = f;
+					obj.animationMove[aniId].screenOverrideY = true;
 				}
 			}
 		}
-		
-		console.log(obj.name, obj.animationVariance, obj.animationMove);
 	}
 };
+
+
 
 
 //------------------------------------------------------------------------------
@@ -216,7 +345,19 @@ BattleManager.actionActionAnimation = function(actionArgs) {
 	var aniIdMax = Math.max(0, aniId);
 	dingk.AV.AnimVariance[aniIdMax] = aniVarArr[aniIdMax];
 	dingk.AV.AnimMove[aniIdMax] = aniMovArr[aniIdMax];
+	dingk.AV.AnimVariance[aniIdMax].subject =
+		this._subject.battler();
 	dingk.AV.BM_actionActionAnimation.call(this, actionArgs);
+};
+
+BattleManager.getSubjectPosition = function() {
+	if (this._subject.isActor()) {
+		var actorSprite = 
+			this._spriteset._actorSprites[this._subject._actorId - 1];
+		return [actorSprite.x, actorSprite.y];
+	} else {
+		return [this._subject._screenX, this._subject._screenY];
+	}
 };
 
 //------------------------------------------------------------------------------
@@ -244,6 +385,18 @@ Sprite_Animation.prototype.updateCellSprite = function(sprite, cell) {
         sprite.setFrame(sx, sy, 192, 192);
 		sprite.x = this.transformX(cell[1], cell[2]) + (this.randomPosX || 0) + (this.aniCurrPosX || 0);
 		sprite.y = this.transformY(cell[1], cell[2]) + (this.randomPosY || 0) + (this.aniCurrPosY || 0);
+		if (this.aniScrX && this.aniScrY) {
+			sprite.x = this.aniCurrScrX + (this.randomPosX || 0) + 
+					   (this.aniCurrPosX || 0) - this.aniScrX[1];
+			sprite.y = this.aniCurrScrY + (this.randomPosY || 0) + 
+					   (this.aniCurrPosY || 0) - this.aniScrY[1];
+		} else if (this.aniScrX) {
+			sprite.x = this.aniCurrScrX + (this.randomPosX || 0) + 
+					   (this.aniCurrPosX || 0);
+		} else if (this.aniScrY) {
+			sprite.y = this.aniCurrScrY + (this.randomPosY || 0) + 
+					   (this.aniCurrPosY || 0);
+		}
         sprite.rotation = cell[4] * Math.PI / 180 + (this.randomRotation || 0) + (this.aniCurrRotation || 0);
         sprite.scale.x = cell[3] / 100;
         if(cell[5]){
@@ -279,14 +432,32 @@ Sprite_Animation.prototype.transformY = function(x, y) {
 
 Sprite_Animation.prototype.updateAniMove = function() {
 	if (this.aniCurrFrame === this.aniFrames) return;
-	var dr = (this.aniRotation[1] - this.aniRotation[0]) / this.aniFrames;
-	var dx = (this.aniPosX[1] - this.aniPosX[0]) / this.aniFrames;
-	var dy = (this.aniPosY[1] - this.aniPosY[0]) / this.aniFrames;
-	
-	this.aniCurrFrame++;
-	this.aniCurrRotation += dr;
-	this.aniCurrPosX += dx;
-	this.aniCurrPosY += dy;
+	++this.aniCurrFrame;
+	this.aniCurrRotation = this.calculateMove(this.aniRFormula, this.aniRotation[0], this.aniRotation[1]);
+	this.aniCurrPosX = this.calculateMove(this.aniXFormula, this.aniPosX[0], this.aniPosX[1]);
+	this.aniCurrPosY = this.calculateMove(this.aniYFormula, this.aniPosY[0], this.aniPosY[1]);
+	if (this.aniScrX)
+		this.aniCurrScrX = this.calculateMove(this.aniSXFormula, this.aniScrX[0], this.aniScrX[1]);
+	if (this.aniScrY)
+		this.aniCurrScrY = this.calculateMove(this.aniSYFormula, this.aniScrY[0], this.aniScrY[1]);
+};
+
+Sprite_Animation.prototype.calculateMove = function(formula, start, end) {
+	if (formula !== 'n' && start === 0 && end === 0)
+		return this.calculateAdvancedMove(formula);
+	var frameFormula = formula.replace('n', 'this.aniFrames');
+	var x = this.aniCurrFrame;
+	if (formula[0] === '-') {
+		formula = formula.substring(1);
+	}
+	var result = this.formulaEval(formula) * (end - start) / 
+				 this.formulaEval(frameFormula) + start;
+	return result;
+};
+
+Sprite_Animation.prototype.calculateAdvancedMove = function(formula) {
+	var result = this.formulaEval(formula);
+	return result;
 };
 
 dingk.AV.SA_setup = Sprite_Animation.prototype.setup;
@@ -295,18 +466,68 @@ Sprite_Animation.prototype.setup = function(target, animation, mirror, delay, an
 	this.randomRotation = 0, this.randomPosX = 0, this.randomPosY = 0;
 	this.aniRotation = [0, 0], this.aniPosX = [0, 0], this.aniPosY = [0, 0], this.aniFrames = 0;
 	this.aniCurrRotation = 0, this.aniCurrPosX = 0, this.aniCurrPosY = 0, this.aniCurrFrame = 0;
+	this._subject = dingk.AV.AnimVariance[animation.id].subject;
 	if (!aniVar) return;
 	this.randomRotation = aniVar[0] * Math.PI / 180;
-	this.randomPosX = aniVar[1];
-	this.randomPosY = aniVar[2];
+	this.randomPosX = this.formulaEval(aniVar[1]);
+	this.randomPosY = this.formulaEval(aniVar[2]);
 	if (!aniMov) return;
 	this.aniRotation = [aniMov[0][0] * Math.PI / 180, aniMov[0][1] * Math.PI / 180];
-	this.aniPosX = aniMov[1];
-	this.aniPosY = aniMov[2];
-	this.aniFrames = aniMov[3];
+	this.aniPosX = this.formulaEval(aniMov[1]);
+	this.aniPosY = this.formulaEval(aniMov[2]);
+	this.aniScrX = this.screenEval(aniMov[3]);
+	this.aniScrY = this.screenEval(aniMov[4]);
+	if (JSON.stringify(this.aniScrX) === JSON.stringify([-1, -1]))
+		this.aniScrX = false;
+	if (JSON.stringify(this.aniScrY) === JSON.stringify([-1, -1]))
+		this.aniScrY = false;
+	this.aniFrames = aniMov[5];
+	this.aniRFormula = aniMov[6];
+	this.aniXFormula = aniMov[7];
+	this.aniYFormula = aniMov[8];
+	this.aniSXFormula = aniMov[9];
+	this.aniSYFormula = aniMov[10];
 	this.aniCurrRotation = this.aniRotation[0];
 	this.aniCurrPosX = this.aniPosX[0];
 	this.aniCurrPosY = this.aniPosY[0];
+	if (this.aniScrX) this.aniCurrScrX = this.aniScrX[0];
+	if (this.aniScrY) this.aniCurrScrY = this.aniScrY[0];
+};
+
+Sprite_Animation.prototype.formulaEval = function(formula) {
+	var n = this.aniCurrFrame;
+	var result = 0;
+	try {
+		result = eval(formula);
+	} catch (e) {
+		console.log('ERROR: Bad animation formula eval');
+		console.error(e);
+		return 0;
+	}
+	
+	return result;
+};
+
+Sprite_Animation.prototype.screenEval = function(formula) {
+	var a = this._subject;
+	var b = this._target;
+	var ax = -1, ay = -1;
+	if (a) {
+		var ax = this._subject.x;
+		var ay = this._subject.y + - this._subject.height / 2 + this._target.height / 2;
+	}
+	var bx = b.x;
+	var by = b.y;
+	var result = false;
+	try {
+		result = [eval(formula[0]), eval(formula[1])];
+	} catch (e) {
+		console.log('ERROR: Bad screen formula eval');
+		console.error(e);
+		return false;
+	}
+	
+	return result;
 };
 
 //------------------------------------------------------------------------------
@@ -351,17 +572,36 @@ Sprite_Battler.prototype.getRandomizedAnimation = function(aniVar) {
 };
 
 Sprite_Battler.prototype.getAnimationMove = function(aniMov) {
-	if (!aniMov) return [[0, 0], [0, 0], [0, 0], 0];
+	if (!aniMov) return [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], 0, 
+						 'n', 'n', 'n', 'n', 'n'];
 	var rotation = [0, 0], posX = [0, 0], posY = [0, 0], frames = 0;
+	var scrX = [-1, -1], scrY = [-1, -1];
+	var rFormula = 'n', xFormula = 'n', yFormula = 'n';
+	var sxFormula = 'n', syFormula = 'n';
 	if (aniMov.rotation)
 		rotation = aniMov.rotation;
 	if (aniMov.positionX)
 		posX = aniMov.positionX;
 	if (aniMov.positionY)
 		posY = aniMov.positionY;
+	if (aniMov.screenX && aniMov.screenOverrideX)
+		scrX = aniMov.screenX;
+	if (aniMov.screenY && aniMov.screenOverrideY)
+		scrY = aniMov.screenY;
 	if (aniMov.frames)
 		frames = aniMov.frames;
-	return [rotation, posX, posY, frames];
+	if (aniMov.RFormula)
+		rFormula = aniMov.RFormula;
+	if (aniMov.XFormula)
+		xFormula = aniMov.XFormula;
+	if (aniMov.YFormula)
+		yFormula = aniMov.YFormula;
+	if (aniMov.sxFormula)
+		sxFormula = aniMov.SXFormula;
+	if (aniMov.syFormula)
+		syFormula = aniMov.SYFormula;
+	return [rotation, posX, posY, scrX, scrY, frames, 
+		    rFormula, xFormula, yFormula, sxFormula, syFormula];
 };
 
 //------------------------------------------------------------------------------
@@ -411,7 +651,7 @@ dingk.AV.WBL_showNormalAni = Window_BattleLog.prototype.showNormalAnimation;
 Window_BattleLog.prototype.showNormalAnimation = 
 	function(targets, animationId, mirror) {
 	var animation = $dataAnimations[animationId];
-	if (dingk.AV.AnimMove[animationId] && 
+	if (animation && dingk.AV.AnimMove[animationId] && 
 		!dingk.AV.AnimMove[animationId].frames) 
 		dingk.AV.AnimMove[animationId].frames = animation.frames.length;
 	dingk.AV.WBL_showNormalAni.call(this, targets, animationId, mirror);
@@ -425,6 +665,13 @@ Window_BattleLog.prototype.startAction = function(subject, action, targets) {
 	var aniId = Math.max(0, item.animationId);
 	dingk.AV.AnimVariance[aniId] = item.animationVariance[aniId];
 	dingk.AV.AnimMove[aniId] = item.animationMove[aniId];
+	if (subject.isActor()) {
+		dingk.AV.AnimVariance[aniId].subject = 
+			BattleManager._spriteset._actorSprites[subject.index()];
+	} else {
+		dingk.AV.AnimVariance[aniId].subject = 
+			BattleManager._spriteset._enemySprites[subject.index()];
+	}
 	
 	dingk.AV.WBL_startAction.call(this, subject, action, targets);
 };
