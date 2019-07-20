@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Animation Variance v0.2.1 by dingk
+ * Animation Variance v0.3 by dingk
  * For use in RMMV 1.6.2
  ******************************************************************************/
 
@@ -10,8 +10,19 @@ var dingk = dingk || {};
 dingk.AV = dingk.AV || {};
 
 /*:
- * @plugindesc [v0.2.1] Allow slight variations in battle animations.
+ * @plugindesc [v0.3] Allow slight variations in battle animations.
  * @author dingk
+ *
+ * @param Animation Move Rate
+ * @desc The rate at which the animation moves. 0 - default rate,
+ * 1 - 60 FPS, 2 - 30 FPS, 3 - 20 FPS, 4 - 15 FPS
+ * @type select
+ * @option 0
+ * @option 1
+ * @option 2
+ * @option 3
+ * @option 4
+ * @default 0
  *
  * @help
  * -----------------------------------------------------------------------------
@@ -26,6 +37,17 @@ dingk.AV = dingk.AV || {};
  * animations move with respect to the origin.
  *
  * This plugin is in development, and things may change.
+ *
+ * -----------------------------------------------------------------------------
+ *   Plugin Parameters
+ * -----------------------------------------------------------------------------
+ * Animation Move Rate
+ *  > The frame rate at which the animation moves. Animations run at 15 FPS by 
+ *    default.
+ *  > 0 - Same as default animation frame rate. If you used another plugin to 
+ *    change animation frame rate, this option will sync up animation and 
+ *    movement frames.
+ *  > 1 - 60 FPS, 2 - 30 FPS, 3 - 20 FPS, 4 - 15 FPS
  *
  * -----------------------------------------------------------------------------
  *   Notetags
@@ -120,19 +142,27 @@ dingk.AV = dingk.AV || {};
  *  > Free and commercial use and redistribution (under MIT License).
  *
  * -----------------------------------------------------------------------------
- *   Changelog
+ *   Changelog 
  * -----------------------------------------------------------------------------
- * v0.2.1
+ * v0.3 - Feature update
+ *  - New feature: Animation move rate
+ *  - Fixed a bug that failed to read negative values properly when using an 
+ *    advanced action animation move.
+ *  - Errors for bad formulas will now display the formula in the console.
+ * v0.2.1 - Bug fix
  *  - Fixed a bug that caused an animation executed by the enemy to come flying 
  *    offscreen when using screen animation movement.
- * v0.2
+ * v0.2 - Feature update
  *  - New feature: Custom movement formulas
  *  - New animation movement properties: Screen X / Y
  *  - Fixed a bug that crashes the game when executing an action with no 
  *    animation
- * v0.1
+ * v0.1 - Initial
  *  - Development test release
  */
+
+dingk.AV.params = PluginManager.parameters('dingk_AnimationVariance');
+dingk.AV.AnimMoveRate = Number(dingk.AV.params['Animation Move Rate']) || 0;
 
 //------------------------------------------------------------------------------
 // Classes
@@ -275,19 +305,19 @@ DataManager.process_dingk_AV_notetags = function(group) {
 					var r2 = RegExp.$2.trim();
 					obj.animationMove[aniId].screenY = [r1, r2];
 					obj.animationMove[aniId].screenOverrideY = true;
-				} else if (notedata[i].match(/ROTATION: (.*) from (\d+) to (\d+)/i)) {
+				} else if (notedata[i].match(/ROTATION: (.*) from (-?\d+) to (-?\d+)/i)) {
 					var f = RegExp.$1.trim();
 					var r1 = Number(RegExp.$2);
 					var r2 = Number(RegExp.$3);
 					obj.animationMove[aniId].rotation = [r1, r2];
 					obj.animationMove[aniId].RFormula = f;
-				} else if (notedata[i].match(/POSITION X: (.*) from (\d+) to (\d+)/i)) {
+				} else if (notedata[i].match(/POSITION X: (.*) from (-?\d+) to (-?\d+)/i)) {
 					var f = RegExp.$1.trim();
 					var r1 = Number(RegExp.$2);
 					var r2 = Number(RegExp.$3);
 					obj.animationMove[aniId].positionX = [r1, r2];
 					obj.animationMove[aniId].XFormula = f;
-				} else if (notedata[i].match(/POSITION Y: (.*) from (\d+) to (\d+)/i)) {
+				} else if (notedata[i].match(/POSITION Y: (.*) from (-?\d+) to (-?\d+)/i)) {
 					var f = RegExp.$1.trim();
 					var r1 = Number(RegExp.$2);
 					var r2 = Number(RegExp.$3);
@@ -378,6 +408,42 @@ Sprite_Base.prototype.startAnimation = function(animation, mirror, delay, aniVar
 // Sprite_Animation
 //------------------------------------------------------------------------------
 
+Sprite_Animation.prototype.updateMain = function() {
+    if (this.isPlaying() && this.isReady()) {
+        if (this._delay > 0) {
+            this._delay--;
+        } else {
+            this._duration--;
+            this.updatePosition();
+            dingk.AV.AnimMoveRate = dingk.AV.AnimMoveRate || this._rate;
+			if (this._duration % this._rate === 0) {
+				this.updateTiming();
+			}
+            if (this._duration % dingk.AV.AnimMoveRate === 0) {
+                this.updateFrame();
+            }
+        }
+    }
+};
+
+Sprite_Animation.prototype.updateFrame = function() {
+	if (this._duration > 0) {
+		var frameIndex = this.currentFrameIndex();
+		this.updateAllCellSprites(this._animation.frames[frameIndex]);
+	}
+};
+
+Sprite_Animation.prototype.updateTiming = function() {
+	if (this._duration > 0) {
+		var frameIndex = this.currentFrameIndex();
+		this._animation.timings.forEach(function(timing) {
+			if (timing.frame === frameIndex) {
+				this.processTimingData(timing);
+			}
+		}, this);
+	}
+};
+
 Sprite_Animation.prototype.updateCellSprite = function(sprite, cell) {
     var pattern = cell[0];
     if (pattern >= 0) {
@@ -434,7 +500,7 @@ Sprite_Animation.prototype.transformY = function(x, y) {
 };
 
 Sprite_Animation.prototype.updateAniMove = function() {
-	if (this.aniCurrFrame === this.aniFrames) return;
+	if (this.aniCurrFrame >= this.aniFrames) return;
 	++this.aniCurrFrame;
 	this.aniCurrRotation = this.calculateMove(this.aniRFormula, this.aniRotation[0], this.aniRotation[1]);
 	this.aniCurrPosX = this.calculateMove(this.aniXFormula, this.aniPosX[0], this.aniPosX[1]);
@@ -484,7 +550,8 @@ Sprite_Animation.prototype.setup = function(target, animation, mirror, delay, an
 		this.aniScrX = false;
 	if (JSON.stringify(this.aniScrY) === JSON.stringify([-1, -1]))
 		this.aniScrY = false;
-	this.aniFrames = aniMov[5];
+	this.aniFrames = aniMov[5] || animation.frames.length * this._rate / 
+		dingk.AV.AnimMoveRate;
 	this.aniRFormula = aniMov[6];
 	this.aniXFormula = aniMov[7];
 	this.aniYFormula = aniMov[8];
@@ -503,7 +570,7 @@ Sprite_Animation.prototype.formulaEval = function(formula) {
 	try {
 		result = eval(formula);
 	} catch (e) {
-		console.log('ERROR: Bad animation formula eval');
+		console.log('ERROR: Bad animation formula eval', formula);
 		console.error(e);
 		return 0;
 	}
@@ -527,7 +594,7 @@ Sprite_Animation.prototype.screenEval = function(formula) {
 	try {
 		result = [eval(formula[0]), eval(formula[1])];
 	} catch (e) {
-		console.log('ERROR: Bad screen formula eval');
+		console.log('ERROR: Bad screen formula eval', formula);
 		console.error(e);
 		return false;
 	}
@@ -650,16 +717,6 @@ Window_BattleLog.prototype.showEnemyAttackAnimation = function(subject, targets)
 	dingk.AV.AnimMove[aniId] = dingk.AV.AnimMove[0];
 	dingk.AV.WBL_sEAA.call(this, subject, targets);
 };
-};
-
-dingk.AV.WBL_showNormalAni = Window_BattleLog.prototype.showNormalAnimation;
-Window_BattleLog.prototype.showNormalAnimation = 
-	function(targets, animationId, mirror) {
-	var animation = $dataAnimations[animationId];
-	if (animation && dingk.AV.AnimMove[animationId] && 
-		!dingk.AV.AnimMove[animationId].frames) 
-		dingk.AV.AnimMove[animationId].frames = animation.frames.length;
-	dingk.AV.WBL_showNormalAni.call(this, targets, animationId, mirror);
 };
 
 if (!Imported.YEP_BattleEngineCore) {
