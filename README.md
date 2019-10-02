@@ -1,3 +1,4 @@
 # dingk's RPG Maker MV Plugins
 
-[Multicast](https://jwu3428.github.io/RMMV/Multicast/)
+## [Multicast v1.1.1](https://forums.rpgmakerweb.com/index.php?threads/multicast.110706/)
+Allows actors to perform more than one skill per turn.
