@@ -1,4 +1,3 @@
-# dingk's RPG Maker MV Plugins
 Welcome to my [RPG Maker MV](https://www.rpgmakerweb.com/products/programs/rpg-maker-mv) plugins page!  
 Below you will find plugins made exclusively for RPG Maker MV.  
 Click the subheaders to view that plugin's RPG Maker forum post and download link.  
