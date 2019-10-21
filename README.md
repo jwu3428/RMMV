@@ -13,7 +13,8 @@ Stable plugins are feature-complete and are unlikely to have big changes in the 
   <span style='float: right'>
     <a href='https://raw.githubusercontent.com/jwu3428/RMMV/master/Multicast/dingk_Multicast.js'>Code</a>
   </span>
-</h3>  
+</h3>
+
 *Updated July 9, 2019*  
 Allow actors to perform more than one skill per turn.
 
