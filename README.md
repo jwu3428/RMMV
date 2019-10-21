@@ -6,10 +6,8 @@ Click the subheaders to view that plugin's forum post and download link.
 ## Stable Releases
 Stable plugins are feature-complete and are unlikely to have big changes in the future.
 
-<h3>
-  <span style='float: left'>
-    <a href='https://forums.rpgmakerweb.com/index.php?threads/110706/'>Multicast v1.1.1</a>
-  </span>
+<h3 style='text-align: left'>
+  <a href='https://forums.rpgmakerweb.com/index.php?threads/110706/'>Multicast v1.1.1</a>
   <span style='float: right'>
     <a href='https://raw.githubusercontent.com/jwu3428/RMMV/master/Multicast/dingk_Multicast.js'>Code</a>
   </span>
