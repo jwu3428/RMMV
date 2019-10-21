@@ -7,7 +7,9 @@ Click the subheaders to view that plugin's forum post and download link.
 Stable plugins are feature-complete and are unlikely to have big changes in the future.
 
 ### [Multicast v1.1.1](https://forums.rpgmakerweb.com/index.php?threads/110706/)
-Allows actors to perform more than one skill per turn.
+<div style='text-align: right'><a href='https://forums.rpgmakerweb.com/index.php?threads/110706/'>Download</a></div>  
+*Updated July 9, 2019*  
+Allow actors to perform more than one skill per turn.
 
 ## Plugins in Development
 Plugins in development may have bugs and may change over time. Use at your own risk.
