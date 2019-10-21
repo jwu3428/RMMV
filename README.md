@@ -9,7 +9,7 @@ Stable plugins are feature-complete and are unlikely to have big changes in the 
 <h3 style='text-align: left'>
   <a href='https://forums.rpgmakerweb.com/index.php?threads/110706/'>Multicast v1.1.1</a>
   <span style='float: right'>
-    <button name='multicast' onclick='https://raw.githubusercontent.com/jwu3428/RMMV/master/Multicast/dingk_Multicast.js'>Code</button>
+    <a href='https://raw.githubusercontent.com/jwu3428/RMMV/master/Multicast/dingk_Multicast.js'>Code</a>
   </span>
 </h3>
 
