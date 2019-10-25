@@ -47,7 +47,7 @@ You may view the progress on the [**dev**](https://github.com/jwu3428/RMMV/tree/
 <h3 style='text-align: left'>
   Equipment Levels
   <span style='float: right'>
-    <a href='https://github.com/jwu3428/RMMV/blob/dev/Cooking/dingk_Cooking.js'>(In Progress)</a>
+    (In Progress)
   </span>
 </h3>
 Adds a level system to weapons and armor, allowing stat scaling.
