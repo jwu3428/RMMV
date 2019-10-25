@@ -38,3 +38,37 @@ Allow randomized variations and custom movement in animations.
 
 *Coming soon*  
 Create item/loot drop pools within the editor.
+
+---
+
+<h3 style='text-align: left'>
+  Equipment Levels
+  <span style='float: right'>
+    (In Progress)
+  </span>
+</h3>
+Adds a level system to weapons and armor, allowing stat scaling.
+
+<h3 style='text-align: left'>
+  Cooking
+  <span style='float: right'>
+    (In Progress)
+  </span>
+</h3>
+Craft items based on what ingredients the player has selected.
+
+<h3 style='text-align: left'>
+  States++
+  <span style='float: right'>
+    (In Progress)
+  </span>
+</h3>
+Allow state stacking and state tiers.
+
+<h3 style='text-align: left'>
+  Buffs++
+  <span style='float: right'>
+    (In Progress)
+  </span>
+</h3>
+Reworks the default buffs system to allow direct adjustment to buff amount.
