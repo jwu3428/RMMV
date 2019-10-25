@@ -32,19 +32,22 @@ Allow randomized variations and custom movement in animations.
 <h3 style='text-align: left'>
   Item Pools
   <span style='float: right'>
-    (Coming Soon)
+    <a href='https://raw.githubusercontent.com/jwu3428/RMMV/dev/ItemPools/dingk_ItemPools.js'>Code</a>
   </span>
 </h3>
 
-*Coming soon*  
+*Initial upload October 25, 2019*
+*Forum post pending*
 Create item/loot drop pools within the editor.
 
----
+## Planned
+There are several planned plugins below, ordered by priority of development.
+You may view the progress on the [**dev**](https://github.com/jwu3428/RMMV/tree/dev) branch.
 
 <h3 style='text-align: left'>
   Equipment Levels
   <span style='float: right'>
-    (In Progress)
+    <a href='https://github.com/jwu3428/RMMV/blob/dev/Cooking/dingk_Cooking.js'>(In Progress)</a>
   </span>
 </h3>
 Adds a level system to weapons and armor, allowing stat scaling.
@@ -52,7 +55,7 @@ Adds a level system to weapons and armor, allowing stat scaling.
 <h3 style='text-align: left'>
   Cooking
   <span style='float: right'>
-    (In Progress)
+    <a href='https://github.com/jwu3428/RMMV/blob/dev/Cooking/dingk_Cooking.js'>(In Progress)</a>
   </span>
 </h3>
 Craft items based on what ingredients the player has selected.
@@ -60,7 +63,7 @@ Craft items based on what ingredients the player has selected.
 <h3 style='text-align: left'>
   States++
   <span style='float: right'>
-    (In Progress)
+    <a href='https://github.com/jwu3428/RMMV/tree/dev/StatesPlus'>(In Progress)</a>
   </span>
 </h3>
 Allow state stacking and state tiers.
