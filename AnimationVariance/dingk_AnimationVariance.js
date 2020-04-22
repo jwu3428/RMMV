@@ -11,7 +11,7 @@ var dingk = dingk || {};
 dingk.AV = dingk.AV || {};
 
 /*:
- * @plugindesc [v0.4] Allow randomized variations and custom movement in animations.
+ * @plugindesc [v0.4.1] Allow randomized variations and custom movement in animations.
  * @author dingk
  *
  * @param Animation Move Rate
@@ -207,6 +207,8 @@ dingk.AV = dingk.AV || {};
  * -----------------------------------------------------------------------------
  *   Changelog
  * -----------------------------------------------------------------------------
+ * v0.4.1 - Bug fix
+ *  - Fixed a bug that caused mirrored animations to not display properly
  * v0.4 - Feature update
  *  - New feature: Map animation variance/movement
  *  - New feature: Global animation variance (see plugin parameters)
@@ -369,9 +371,9 @@ dingk.AV.params = PluginManager.parameters('dingk_AnimationVariance');
 dingk.AV.AnimMoveRate = Number(dingk.AV.params['Animation Move Rate']) || 0;
 dingk.AV.AnimJson = dingk.AV.params['Global Animation Variance'];
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // Classes
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
 class AnimationVariance {
 	constructor(rotation = [0, 0], positionX = [0, 0], positionY = [0, 0]) {
@@ -405,9 +407,9 @@ dingk.AV._moveCache = [];
 dingk.AV.AnimVariance = [];
 dingk.AV.AnimMove = [];
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // DataManager
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
 dingk.AV.DataManager_isDatabaseLoaded = DataManager.isDatabaseLoaded;
 DataManager.isDatabaseLoaded = function() {
@@ -567,9 +569,9 @@ DataManager.process_dingk_AV_notetags = function(group) {
 	}
 };
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // BattleManager
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
 // YEP_BattleEngineCore
 dingk.AV.BM_actionActionAnimation = BattleManager.actionActionAnimation;
@@ -606,12 +608,11 @@ BattleManager.updateBattleEnd = function() {
 	ResetAnimations();
 };
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // Sprite_Base
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
-Sprite_Base.prototype.startAnimation =
-	function(animation, mirror, delay, aniVar, aniMov)
+Sprite_Base.prototype.startAnimation = function(animation, mirror, delay, aniVar, aniMov)
 {
 	var sprite = new Sprite_Animation();
 	sprite.setup(this._effectTarget, animation, mirror, delay, aniVar, aniMov);
@@ -661,9 +662,9 @@ Sprite_Base.prototype.getAnimationMove = function(aniMov) {
 			overrideSX, overrideSY];
 };
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // Sprite_Animation
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
 Sprite_Animation.prototype.updateMain = function() {
     if (this.isPlaying() && this.isReady()) {
@@ -745,12 +746,22 @@ Sprite_Animation.prototype.updateCellSprite = function(sprite, cell) {
 Sprite_Animation.prototype.transformX = function(x, y) {
 	var r = this._variance.randomR || 0;
 	var m = this._variance.currentR || 0;
+	if (this._mirror) {
+		x *= -1;
+		r *= -1;
+		m *= -1;
+	}
 	return x * Math.cos(r + m) - y * Math.sin(r + m);
 };
 
 Sprite_Animation.prototype.transformY = function(x, y) {
 	var r = this._variance.randomR || 0;
 	var m = this._variance.currentR || 0;
+	if (this._mirror) {
+		x *= -1;
+		r *= -1;
+		m *= -1;
+	}
 	return y * Math.cos(r + m) + x * Math.sin(r + m);
 };
 
@@ -885,9 +896,9 @@ Sprite_Animation.prototype.screenEval = function(formula) {
 	return result;
 };
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // Sprite_Character
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
 Sprite_Character.prototype.setupAnimation = function() {
 	if (this._character.animationId() > 0) {
@@ -900,9 +911,9 @@ Sprite_Character.prototype.setupAnimation = function() {
 	}
 };
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // Sprite_Battler
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
 Sprite_Battler.prototype.setupAnimation = function() {
     while (this._battler.isAnimationRequested()) {
@@ -921,9 +932,9 @@ Sprite_Battler.prototype.setupAnimation = function() {
     }
 };
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // Window_BattleLog
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
 dingk.AV.WBL_showAAtkAnim = Window_BattleLog.prototype.showActorAttackAnimation;
 Window_BattleLog.prototype.showActorAttackAnimation = function(subject, targets) {
@@ -1026,9 +1037,9 @@ Window_BattleLog.prototype.startAction = function(subject, action, targets) {
 
 };
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // Scripts
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
 dingk.AV.setup = function() {
 	if (!dingk.AV.AnimJson) return;
