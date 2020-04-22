@@ -1,6 +1,6 @@
 /*******************************************************************************
- * Animation Variance v0.4 by dingk
- * Updated September 27, 2019
+ * Animation Variance v0.4.1 by dingk
+ * Updated April 22, 2020
  * For use in RMMV 1.6.2
  ******************************************************************************/
 
