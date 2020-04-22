@@ -326,16 +326,11 @@ dingk.EL.version = 1.0;
 if (Imported.YEP_ItemCore) {
 
 dingk.EL.params = PluginManager.parameters('dingk_EquipLevels');
-dingk.EL.itemDropLevelType =
-	Number(dingk.EL.params['Item Drop Level Type']) || 0;
-dingk.EL.enableEnemyLevels =
-	dingk.EL.params['Enable Enemy Levels'] === 'true';
-dingk.EL.EnableLevelVariance = 
-	dingk.EL.params['Enable Level Variance'] === 'true';
-dingk.EL.LevelVarianceUp =
-	Number(dingk.EL.params['Level Variance Increase']) || 1;
-dingk.EL.LevelVarianceDown =
-	Number(dingk.EL.params['Level Variance Decrease']) || 1;
+dingk.EL.itemDropLevelType = Number(dingk.EL.params['Item Drop Level Type']) || 0;
+dingk.EL.enableEnemyLevels = dingk.EL.params['Enable Enemy Levels'] === 'true';
+dingk.EL.EnableLevelVariance = dingk.EL.params['Enable Level Variance'] === 'true';
+dingk.EL.LevelVarianceUp = Number(dingk.EL.params['Level Variance Increase']) || 1;
+dingk.EL.LevelVarianceDown = Number(dingk.EL.params['Level Variance Decrease']) || 1;
 dingk.EL.MaxLevel = Number(dingk.EL.params['Max Equip Level']) || 100;
 dingk.EL.Tiers = dingk.EL.params['Tiers'];
 dingk.EL.DefaultTier = Number(dingk.EL.params['Default Tier']) || 0;
@@ -359,10 +354,14 @@ dingk.EL.DisplayFmtFull = dingk.EL.params['levelFmtLong'];
 dingk.EL.DisplayShopInfo = dingk.EL.params['levelShopInfo'] === 'true';
 dingk.EL.Aliases = JSON.parse(dingk.EL.params['aliases']);
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // DataManager
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
+/**
+ * Check if database is loaded, then process notetags
+ * @return {bool} Whether database has loaded
+ */
 dingk.EL.DataManager_isDatabaseLoaded = DataManager.isDatabaseLoaded;
 DataManager.isDatabaseLoaded = function() {
 	if (!dingk.EL.DataManager_isDatabaseLoaded.call(this)) return false;
@@ -379,6 +378,7 @@ DataManager.isDatabaseLoaded = function() {
 	return true;
 };
 
+/** Parse json from plugin parameters */
 DataManager.dingk_EquipLevels_setup = function() {
 	let tiers = [];
 	for (let tier of JSON.parse(dingk.EL.Tiers)) {
@@ -389,6 +389,10 @@ DataManager.dingk_EquipLevels_setup = function() {
 	dingk.EL.Tiers = tiers;
 };
 
+/** 
+ * Parse notetags
+ * @param {Array} group - List of database objects
+ */
 DataManager.process_dingk_EquipLevels_notetags1 = function(group) {
 	let regEx = [
 		/<FODDER EXP\s*(.*)?:\s*(\d+)>/i,
@@ -431,6 +435,10 @@ DataManager.process_dingk_EquipLevels_notetags1 = function(group) {
 	}
 };
 
+/** 
+ * Parse notetags
+ * @param {Array} group - List of database objects
+ */
 DataManager.process_dingk_EquipLevels_notetags2 = function(group) {
 	let regEx = [
 		/<DROP LEVEL:\s*(\d+)>/i,
@@ -589,6 +597,7 @@ DataManager.process_dingk_EquipLevels_notetags2 = function(group) {
 	}
 };
 
+/**  Parse enemy notetags */
 DataManager.process_dingk_EquipLevels_notetagsEnemies = function() {
 	let regEx = [
 		/<DROP LEVEL:\s*(\d+)\s*-?\s*(\d+)?/i,
@@ -620,9 +629,9 @@ DataManager.process_dingk_EquipLevels_notetagsEnemies = function() {
 	}
 };
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // ItemManager
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
 /*
 dingk.EL.IM_SNII = ItemManager.setNewIndependentItem;
@@ -631,6 +640,11 @@ ItemManager.setNewIndependentItem = function(baseItem, newItem) {
 	newItem.equipParamFormula = baseItem.equipParamFormula || {};
 };*/
 
+/**
+ * Update equipment parameters
+ * @param {Object} baseItem - The base item
+ * @param {Object} newItem - The independent item
+ */
 ItemManager.setEquipParameters = function(baseItem, newItem) {
 	if (!baseItem.params) return;
 	if (!newItem.level || newItem.level < 0)
@@ -673,6 +687,12 @@ ItemManager.setEquipParameters = function(baseItem, newItem) {
 	this.updateItemName(newItem);
 };
 
+/**
+ * Return equipment parameters
+ * @param {Object} item - The equipment to extract parameters from
+ * @param {Number} level - The desired level of the equipment
+ * @return {Array} List of the parameters calculated at the desired level
+ */
 ItemManager.getEquipParameters = function(item, level) {
 	if (!item) return;
 	
@@ -712,21 +732,36 @@ ItemManager.getEquipParameters = function(item, level) {
 	return params;
 };
 
+/**
+ * Update equipment parameters after customizing new independent item
+ * @param {Object} baseItem - The base item
+ * @param {Object} newItem - The independent item
+ */
 dingk.EL.IM_CNII = ItemManager.customizeNewIndependentItem;
 ItemManager.customizeNewIndependentItem = function(baseItem, newItem) {
 	dingk.EL.IM_CNII.call(this, baseItem, newItem);
 	this.setEquipParameters(baseItem, newItem);
 };
 
+/**
+ * Update item name with level
+ * @param {Object} item - The independent item
+ */
 dingk.EL.ItemManager_updateItemName = ItemManager.updateItemName;
 ItemManager.updateItemName = function(item) {
-    dingk.EL.ItemManager_updateItemName.call(this, item);
-    if (item.displayLevel && item.level > 0) {
-    	let fmt = dingk.EL.DisplayFmt;
-    	if (fmt) item.name = fmt.format(item.name, item.level);
-    }
+	dingk.EL.ItemManager_updateItemName.call(this, item);
+	if (item.displayLevel && item.level > 0) {
+		let fmt = dingk.EL.DisplayFmt;
+		if (fmt) item.name = fmt.format(item.name, item.level);
+	}
 };
 
+/**
+ * Register new independent item and set its level
+ * @param {Object} item - The base item
+ * @param {Number} level - The level of the item
+ * @return {Object} The new independent item
+ */
 ItemManager.registerEquipLevel = function(item, level) {
 	if (!DataManager.isIndependent(item)) return item;
 	let newItem = DataManager.registerNewItem(item);
@@ -734,6 +769,12 @@ ItemManager.registerEquipLevel = function(item, level) {
 	return newItem;
 };
 
+/**
+ * Return EXP required to level up the equipment at the specified level
+ * @param {Object} item - The independent item
+ * @param {Number} level - The level of the equipment
+ * @return {Number} The EXP required to level up the equipment
+ */
 ItemManager.itemExpForLevel = function(item, level) {
 	let formula = item.equipParamFormula[9];
 	let exp = 0;
@@ -748,6 +789,10 @@ ItemManager.itemExpForLevel = function(item, level) {
 	return exp;
 };
 
+/**
+ * Return the level of the equipment when initialized
+ * @return {Number} Level
+ */
 ItemManager.getLevel = function() {
 	if (SceneManager._scene instanceof Scene_Title) return 1;
 	switch (dingk.EL.itemDropLevelType) {
@@ -762,34 +807,63 @@ ItemManager.getLevel = function() {
 	return 1;
 };
 
+/**
+ * Set the level of the equipment
+ * @param {Object} item - The independent item
+ * @param {Number} level - The level of the item
+ */
 ItemManager.setLevel = function(item, level) {
 	if (!item || DataManager.isItem(item)) return;
 	if (!level) var level = this.getLevel();
-	item.level = level + this.getLevelVariance(item);
+	item.level = level + this.getLevelVariance();
 	item.level.clamp(1, item.maxLevel);
 	this.setEquipParameters(DataManager.getBaseItem(item), item);
 	item.exp = this.itemCurrentLevelExp(item);
 };
 
-ItemManager.getLevelVariance = function(item) {
+/**
+ * Return a random level variance
+ * @return {Number} A random number
+ */
+ItemManager.getLevelVariance = function() {
 	if (!dingk.EL.EnableLevelVariance) return 0;
 	let max = Number(dingk.EL.LevelVarianceUp);
 	let min = Number(dingk.EL.LevelVarianceDown) * -1;
 	return Math.floor(Math.random() * (max - min + 1) + min);
 };
 
+/**
+ * Return EXP required to level up at its current level
+ * @param {Object} item - The independent item
+ * @return {Number} EXP required to level up
+ */
 ItemManager.itemNextLevelExp = function(item) {
 	return this.itemExpForLevel(item, item.level);
 };
 
+/**
+ * Return minimum EXP at the equipment's current level
+ * @param {Object} item - The independent item
+ * @return {Number} Minimum EXP at the equipment's current level
+ */
 ItemManager.itemCurrentLevelExp = function(item) {
 	return this.itemExpForLevel(item, item.level - 1);
 };
 
+/**
+ * Return EXP needed to gain to level up equipment
+ * @param {Object} item - The independent item
+ * @return {Number} Amount of EXP needed to gain to level up
+ */
 ItemManager.itemNextRequiredExp = function(item) {
 	return this.itemNextLevelExp(item) - item.exp;
 };
 
+/**
+ * Set equipment EXP to the specified amount
+ * @param {Object} item - The independent item
+ * @param {Number} exp - The desired EXP
+ */
 ItemManager.itemChangeExp = function(item, exp) {
 	item.exp = exp.clamp(0, this.itemExpForLevel(item, item.maxLevel));
 	
@@ -803,20 +877,39 @@ ItemManager.itemChangeExp = function(item, exp) {
 	}
 };
 
+/**
+ * Level up the equipment
+ * @param {Object} item - The independent item
+ */
 ItemManager.itemLevelUp = function(item) {
 	item.level++;
 	this.setEquipParameters(DataManager.getBaseItem(item), item);
 };
 
+/**
+ * Level up the equipment
+ * @param {Object} item - The independent item
+ */
 ItemManager.itemLevelDown = function(item) {
 	item.level--;
 	this.setEquipParameters(DataManager.getBaseItem(item), item);
 };
 
+/**
+ * Give the equipment some EXP
+ * @param {Object} item - The independent item
+ * @param {Number} exp - The desired amount of EXP
+ */
 ItemManager.itemGainExp = function(item, exp) {
 	this.itemChangeExp(item, item.exp + Math.round(exp));
 };
 
+/**
+ * Return the level given the EXP
+ * @param {Object} item - The independent item
+ * @param {Number} exp - The desired EXP
+ * @return {Number} The level at the specified EXP
+ */
 ItemManager.getNextItemLevel = function(item, exp) {
 	let newExp = Math.round(item.exp + exp);
 	let level = item.level;
@@ -825,20 +918,37 @@ ItemManager.getNextItemLevel = function(item, exp) {
 	return Math.min(level, item.maxLevel);
 };
 
+/**
+ * Check if item is max level
+ * @param {Object} item - The independent item
+ * @return {bool} Whether the item is max level or not
+ */
 ItemManager.isMaxLevel = function(item) {
 	return item.level >= item.maxLevel;
 };
 
+/**
+ * Increase tier of the equipment
+ * @param {Object} item - The independent item
+ */
 ItemManager.itemTierUp = function(item) {
 	item.tier++;
 	this.setEquipParameters(DataManager.getBaseItem(item), item);
 };
 
+/**
+ * Decrease tier of the equipment
+ * @param {Object} item - The independent item
+ */
 ItemManager.itemTierDown = function(item) {
 	item.tier--;
 	this.setEquipParameters(DataManager.getBaseItem(item), item);
 };
 
+/**
+ * Randomize the tier of the equipment
+ * @param {Object} item - The independent item
+ */
 ItemManager.setRandomTier = function(item) {
 	let totalWeight = 0;
 	let minTier = item.tier;
@@ -859,6 +969,11 @@ ItemManager.setRandomTier = function(item) {
 	this.setEquipParameters(DataManager.getBaseItem(item), item);
 };
 
+/**
+ * Swap out base items with their new independent items and set their levels
+ * @param {Array} good - Item of the shop good
+ * @return {Array} New independent item
+ */
 ItemManager.processIndependentGoods = function(good) {
 	let itemType = good[0];
 	let itemId = good[1];
@@ -891,13 +1006,9 @@ ItemManager.processIndependentGoods = function(good) {
 	return good;
 };
 
-//------------------------------------------------------------------------------
-// BattleManager
-//------------------------------------------------------------------------------
-
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // Game_Actor
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
 /*
 dingk.EL.Game_Actor_setup = Game_Actor.prototype.setup;
@@ -908,11 +1019,16 @@ Game_Actor.prototype.setup = function(actorId) {
 };
 */
 
-
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // Game_Enemy
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
+/**
+ * Convert dropped equipment to independent items and set the appropriate levels
+ * @param {Number} kind
+ * @param {Number} dataId
+ * @return {Object} New independent item
+ */
 dingk.EL.GE_itemObject = Game_Enemy.prototype.itemObject;
 Game_Enemy.prototype.itemObject = function(kind, dataId) {
 	let baseItem = dingk.EL.GE_itemObject.call(this, kind, dataId);
@@ -935,10 +1051,15 @@ Game_Enemy.prototype.itemObject = function(kind, dataId) {
 	return newItem;
 };
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // Game_Interpreter
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
+/**
+ * Plugin commands for custom equipment
+ * @param {String} command
+ * @param {Array} args
+ */
 dingk.EL.GI_pluginCommand = Game_Interpreter.prototype.pluginCommand;
 Game_Interpreter.prototype.pluginCommand = function(command, args) {
 	dingk.EL.GI_pluginCommand.call(this, command, args);
@@ -967,18 +1088,30 @@ Game_Interpreter.prototype.pluginCommand = function(command, args) {
 	}
 };
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // Game_Party
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
+/**
+ * Return the level of the highest level party member
+ * @return {Number} Highest level
+ */
 Game_Party.prototype.getHighestLevel = function() {
 	return Math.max.apply(Math, this.members().map(a => a.level));
 };
 
+/**
+ * Return the level of the lowest level party member
+ * @return {Number} Lowest level
+ */
 Game_Party.prototype.getLowestLevel = function() {
 	return Math.min.apply(Math, this.members().map(a => a.level));
 };
 
+/**
+ * Return the average level of the party
+ * @return {Number} Average level
+ */
 Game_Party.prototype.getAverageLevel = function() {
 	let members = this.members();
 	return members.reduce((a, {level}) => a + level, 0) / members.length;
@@ -994,10 +1127,11 @@ Game_Party.prototype.independentItemSort = function(a, b) {
 	return 0;
 };*/
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // Scene_Item
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
+/** Create windows */
 dingk.EL.SI_createInfoWindow = Scene_Item.prototype.createInfoWindow;
 Scene_Item.prototype.createInfoWindow = function() {
 	dingk.EL.SI_createInfoWindow.call(this);
@@ -1005,6 +1139,7 @@ Scene_Item.prototype.createInfoWindow = function() {
 	this.createItemEnhanceListWindow();
 };
 
+/** Create the window for list of item fodders */
 Scene_Item.prototype.createItemEnhanceListWindow = function() {
 	let x = this._itemWindow.x;
 	let y = this._itemWindow.y;
@@ -1020,6 +1155,7 @@ Scene_Item.prototype.createItemEnhanceListWindow = function() {
 		this.onItemEnhanceListOk.bind(this));
 };
 
+/** Create info window for enhancing items */
 Scene_Item.prototype.createItemEnhanceInfoWindow = function() {
 	let x = this._infoWindow.x;
 	let y = this._infoWindow.y;
@@ -1029,14 +1165,15 @@ Scene_Item.prototype.createItemEnhanceInfoWindow = function() {
 	this.addWindow(this._itemEnhanceInfoWindow);
 };
 
-dingk.EL.SI_createActionWindow = 
-	Scene_Item.prototype.createActionWindow;
+/** Add action for enhance command */
+dingk.EL.SI_createActionWindow = Scene_Item.prototype.createActionWindow;
 Scene_Item.prototype.createActionWindow = function() {
 	dingk.EL.SI_createActionWindow.call(this);
 	this._itemActionWindow.setHandler('enhance', 
 		this.onActionItemEnhance.bind(this));
 };
 
+/** Action for enhance command */
 Scene_Item.prototype.onActionItemEnhance = function() {
 	this._itemActionWindow.hide();
 	this._itemActionWindow.deactivate();
@@ -1049,6 +1186,7 @@ Scene_Item.prototype.onActionItemEnhance = function() {
 	this._itemEnhanceListWindow.select(0);
 };
 
+/** Action for canceling enhance */
 Scene_Item.prototype.onItemEnhanceListCancel = function() {
 	this._itemEnhanceListWindow.hide();
 	this._itemEnhanceListWindow.deactivate();
@@ -1064,6 +1202,7 @@ Scene_Item.prototype.onItemEnhanceListCancel = function() {
 	this._helpWindow.setItem(this.item());
 };
 
+/** Action on confirming fodder */
 Scene_Item.prototype.onItemEnhanceListOk = function() {
 	let enhanceItem = this._itemEnhanceListWindow.item();
 	if (enhanceItem) {
@@ -1081,26 +1220,38 @@ Scene_Item.prototype.onItemEnhanceListOk = function() {
 	this._itemEnhanceInfoWindow.refresh();
 };
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // Window_Base
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
+/**
+ * Draw item name with level
+ * @param {Object} item
+ * @param {Number} x
+ * @param {Number} y
+ * @param {Number} width
+ * @param {bool} full
+ */
 Window_Base.prototype.drawItemNameWithLevel = function(item, x, y, width, full) {
 	width = width || 312;
-    if (item) {
-        let iconBoxWidth = Window_Base._iconWidth + 4;
+	if (item) {
+		let iconBoxWidth = Window_Base._iconWidth + 4;
 		this.setItemTextColor(item);
-        this.resetTextColor();
-        this.drawIcon(item.iconIndex, x + 2, y + 2);
-        let fmt = full ? dingk.EL.DisplayFmtFull :
+		this.resetTextColor();
+		this.drawIcon(item.iconIndex, x + 2, y + 2);
+		let fmt = full ? dingk.EL.DisplayFmtFull :
 			dingk.EL.DisplayFmt;
-        let text = fmt.format(item.name, item.level);
-        this.drawText(text, x + iconBoxWidth, y, width - iconBoxWidth);
+		let text = fmt.format(item.name, item.level);
+		this.drawText(text, x + iconBoxWidth, y, width - iconBoxWidth);
 		this._resetTextColor = undefined;
 		this.resetTextColor();
-    }
+	}
 };
 
+/**
+ * Change item name text color based on tier
+ * @param {Object} item
+ */
 dingk.EL.Window_Base_setItemTextColor = Window_Base.prototype.setItemTextColor;
 Window_Base.prototype.setItemTextColor = function(item) {
 	if (!item) return;
@@ -1110,6 +1261,11 @@ Window_Base.prototype.setItemTextColor = function(item) {
 	this._resetTextColor = dingk.EL.Tiers[item.tier].color;
 };
 
+/**
+ * Allow parsing of hex color codes
+ * @param {String} n - Color code
+ * @return {String} Hex color code
+ */
 dingk.EL.Window_Base_textColor = Window_Base.prototype.textColor;
 Window_Base.prototype.textColor = function(n) {
 	if (typeof n === 'string' && n[0] === '#') {
@@ -1125,23 +1281,20 @@ Window_Base.prototype.textColor = function(n) {
 	}
 };
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // Window_ItemActionCommand
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
-dingk.EL.Window_IAC_addCustomCommandsA = 
-	Window_ItemActionCommand.prototype.addCustomCommandsA;
-dingk.EL.Window_IAC_addCustomCommandsB =
-	Window_ItemActionCommand.prototype.addCustomCommandsB;
-dingk.EL.Window_IAC_addCustomCommandsC =
-	Window_ItemActionCommand.prototype.addCustomCommandsC;
-dingk.EL.Window_IAC_addCustomCommandsD =
-	Window_ItemActionCommand.prototype.addCustomCommandsD;
-dingk.EL.Window_IAC_addCustomCommandsE =
-	Window_ItemActionCommand.prototype.addCustomCommandsE;
-dingk.EL.Window_IAC_addCustomCommandsF =
-	Window_ItemActionCommand.prototype.addCustomCommandsF;
+dingk.EL.Window_IAC_addCustomCommandsA = Window_ItemActionCommand.prototype.addCustomCommandsA;
+dingk.EL.Window_IAC_addCustomCommandsB = Window_ItemActionCommand.prototype.addCustomCommandsB;
+dingk.EL.Window_IAC_addCustomCommandsC = Window_ItemActionCommand.prototype.addCustomCommandsC;
+dingk.EL.Window_IAC_addCustomCommandsD = Window_ItemActionCommand.prototype.addCustomCommandsD;
+dingk.EL.Window_IAC_addCustomCommandsE = Window_ItemActionCommand.prototype.addCustomCommandsE;
+dingk.EL.Window_IAC_addCustomCommandsF = Window_ItemActionCommand.prototype.addCustomCommandsF;
 
+/**
+ * Add item enhance command to the item action command window based on user preference
+ */
 switch(dingk.EL.EnhancePriority) {
 	case 1:
 		Window_ItemActionCommand.prototype.addCustomCommandsB = function() {
@@ -1180,16 +1333,25 @@ switch(dingk.EL.EnhancePriority) {
 		};
 };
 
+/**
+ * Check if item can be enhanced
+ * @return {bool} Whether or not the item can be enhanced
+ */
 Window_ItemActionCommand.prototype.isAddItemEnhanceCommand = function() {
 	if (!this._item) return false;
 	return this._item.allowEnhancement;
 };
 
+/**
+ * Check if item can be enhanced
+ * @return {bool} Whether or not the item can be enhanced
+ */
 Window_ItemActionCommand.prototype.isEnableItemEnhanceCommand = function() {
 	if (ItemManager.isMaxLevel(this._item)) return false;
 	return this._item.allowEnhancement;
 }
 
+/** Add item enhance command */
 Window_ItemActionCommand.prototype.addItemEnhanceCommand = function() {
 	let fmt = dingk.EL.EnhanceFmt;
 	let name = '\\i[' + this._item.iconIndex + ']';
@@ -1200,30 +1362,45 @@ Window_ItemActionCommand.prototype.addItemEnhanceCommand = function() {
 	this.addCommand(text, 'enhance', this.isEnableItemEnhanceCommand());
 };
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // Window_ItemEnhanceInfo
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
+/**
+ * Class for a window displaying item enhancement info
+ * @extends Window_Base
+ */
 class Window_ItemEnhanceInfo extends Window_Base {
+	/** Create a window */
 	constructor() {
 		super();
 		this.initialize.apply(this, arguments);
 	}
+	/**
+	 * Initialize window properties
+	 * @param {Number} x - The x position
+	 * @param {Number} y - The y position
+	 * @param {Number} w - Window width
+	 * @param {Number} h - Window height
+	 */
 	initialize(x, y, w, h) {
 		super.initialize.call(this, x, y, w, h);
 		this._currentItem = null;
 		this._fodderExp = 0;
 		this.hide();
 	}
+	/** Update window properties */
 	update() {
 		super.update();
 		this.updateCurrentItem();
 		this.updateVisibility();
 	}
+	/** Change window's current item */
 	updateCurrentItem() {
 		if (this._currentItem === SceneManager._scene.item()) return;
 		this.refresh();
 	}
+	/** Change window visibility */
 	updateVisibility() {
 		let win = SceneManager._scene._itemActionWindow;
 		if (!win) return;
@@ -1236,12 +1413,24 @@ class Window_ItemEnhanceInfo extends Window_Base {
 			this.refresh();
 		}
 	}
+	/**
+	 * Draw dark background for parameters
+	 * @param {Number} dx - The x position
+	 * @param {Number} dy - The y position
+	 * @param {Number} dw - Width
+	 * @param {Number} dh - Height
+	 */
 	drawDarkRect(dx, dy, dw, dh) {
 		let color = this.gaugeBackColor();
 		this.changePaintOpacity(false);
 		this.contents.fillRect(dx + 1, dy + 1, dw - 2, dh - 2, color);
 		this.changePaintOpacity(true);
 	}
+	/**
+	 * Return max width of the resulting parameter text
+	 * @param {Array} params - List of resulting parameters
+	 * @return {Number} The max text width
+	 */
 	getResultTextWidth(params) {
 		let maxWidth = 0;
 		for (let param of params) {
@@ -1251,6 +1440,12 @@ class Window_ItemEnhanceInfo extends Window_Base {
 		
 		return maxWidth;
 	}
+	/**
+	 * Return an array of the differences between old parameters and new parameters of the item
+	 * @param {Object} item - Current item
+	 * @param {Array} params - List of new parameters
+	 * @return {Array} List of the differences
+	 */
 	getParamDifferences(item, params) {
 		let diffs = [];
 		for (let i = 0; i < params.length; i++) {
@@ -1263,6 +1458,12 @@ class Window_ItemEnhanceInfo extends Window_Base {
 		}
 		return diffs;
 	}
+	/**
+	 * Draw the info box containing EXP and parameter information
+	 * @param {Number} dx - The x position
+	 * @param {Number} dy - The y position
+	 * @param {Number} dw - Max width of text
+	 */
 	drawInfoBox(dx, dy, dw) {
 		this.changeTextColor(this.systemColor());
 		this.drawText(dingk.EL.EnhanceInfo['EXP Required'], dx, dy, dw, 'left');
@@ -1319,6 +1520,7 @@ class Window_ItemEnhanceInfo extends Window_Base {
 			this.drawText(text, dx, dy, dw - this.textPadding(), 'right');
 		}
 	}
+	/** Refresh contents of window */
 	refresh() {
 		this.contents.clear();
 		this._currentItem = SceneManager._scene.item();
@@ -1344,36 +1546,65 @@ class Window_ItemEnhanceInfo extends Window_Base {
 				dx, dy, dw, 'center');
 		}
 	}
+	/**
+	 * Set the amount of fodder EXP in the window
+	 * @param {Number} exp - The amount of fodder EXP
+	 */
 	setFodderExp(exp) {
 		this._fodderExp = exp;
 		this.refresh();
 	}
 };
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // Window_ItemEnhanceList
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
+/**
+ * Class for a window showing list of fodder items
+ * @extends Window_ItemList
+ */
 class Window_ItemEnhanceList extends Window_ItemList {
+	/** Create a window */
 	constructor() {
 		super();
 		this.initialize.apply(this, arguments);
 	}
+	/**
+	 * Initialize window properties
+	 * @param {Number} x - The x position
+	 * @param {Number} y - The y position
+	 * @param {Number} w - Window width
+	 * @param {Number} h - Window height
+	 */
 	initialize(x, y, w, h) {
 		super.initialize.call(this, x, y, w, h);
 		this._item = null;
 		this._helpIndex = -1;
 		this.hide();
 	}
+	/**
+	 * Set the info box
+	 * @param {Object} win - Window_ItemEnhanceInfo
+	 */
 	setEnhanceInfoWindow(win) {
 		this._itemEnhanceInfoWindow = win;
 	}
+	/**
+	 * Set the current item being enhanced
+	 * @param {Object} item - Current item
+	 */
 	setItem(item) {
 		if (this._item === item) return;
 		this._item = item;
 		this.refresh();
 		this.select(0);
 	}
+	/**
+	 * Check if item is a fodder
+	 * @param {Object} item - Current item
+	 * @return {bool} Whether item is fodder or not
+	 */
 	includes(item) {
 		if (!item || !this._item) return false;
 		if (!item.fodderExp || item.fodderExp <= 0) return false;
@@ -1388,14 +1619,21 @@ class Window_ItemEnhanceList extends Window_ItemList {
 		
 		return true;
 	}
+	/**
+	 * Item is always enabled
+	 * @param {Object} item - Current item
+	 * @return {Object} Currently enabled item
+	 */
 	isEnabled(item) {
 		return item;
 	}
+	/** List out all the items that match the criteria */
 	makeItemList() {
 		this._data = $gameParty.allItems().filter(function(item) {
 			return this.includes(item);
 		}, this);
 	}
+	/** Update the info box */
 	updateHelp() {
 		super.updateHelp.call(this);
 		if (!this._itemEnhanceInfoWindow) return;
@@ -1405,30 +1643,36 @@ class Window_ItemEnhanceList extends Window_ItemList {
 	}
 };
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // Window_ItemInfo
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
 if (!dingk.EL.DisplayLevel) {
-Window_ItemInfo.prototype.drawItemInfo = function(dy) {
-    let dx = this.textPadding();
-    let dw = this.contents.width - this.textPadding() * 2;
-    this.resetFontSettings();
-    if (this._item.level) this.drawItemNameWithLevel(this._item, dx, dy, dw);
-	else this.drawItemName(this._item, dx, dy, dw);
-    return dy + this.lineHeight();
-};
+	/**
+	 * Draw item name with level if user allows
+	 * @param {Number} dy
+	 * @return {Number} New y position
+	 */
+	Window_ItemInfo.prototype.drawItemInfo = function(dy) {
+		let dx = this.textPadding();
+		let dw = this.contents.width - this.textPadding() * 2;
+		this.resetFontSettings();
+		if (this._item.level) this.drawItemNameWithLevel(this._item, dx, dy, dw);
+		else this.drawItemName(this._item, dx, dy, dw);
+		return dy + this.lineHeight();
+	};
 }
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // Window_ShopStatus
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
 if (dingk.EL.DisplayShopInfo) {
 
+/** Refresh shop window */
 Window_ShopStatus.prototype.refresh = function() {
-    this.contents.clear();
-    if (this._item) {
+	this.contents.clear();
+	if (this._item) {
 		this.resetTextColor();
 		this.resetFontSettings();
 		let x = this.textPadding();
@@ -1453,16 +1697,18 @@ Window_ShopStatus.prototype.refresh = function() {
 	}
 };
 
+/** Draw possession count */
 Window_ShopStatus.prototype.drawPossession = function(x, y) {
-    let width = this.contents.width - this.textPadding() - x;
+	let width = this.contents.width - this.textPadding() - x;
 	if (DataManager.isIndependent(this._item)) {
 		return this.drawIndependentPossession(x, y);
 	}
 	let value = $gameParty.numItems(this._item);
 	value = Yanfly.Util.toGroup(value);
-    this.drawText('\u00d7' + value, x, y, width, 'right');
+	this.drawText('\u00d7' + value, x, y, width, 'right');
 };
 
+/** Draw possession count */
 Window_ShopStatus.prototype.drawIndependentPossession = function(x, y) {
 	let width = this.contents.width - this.textPadding() - x;
 	let baseItem = DataManager.getBaseItem(this._item);
@@ -1471,13 +1717,20 @@ Window_ShopStatus.prototype.drawIndependentPossession = function(x, y) {
 	this.drawText('\u00d7' + value, x, y, width, 'right');
 };
 
-}
-};
+} // if (dingk.EL.DisplayShopInfo)
 
-//------------------------------------------------------------------------------
+}; // if (Imported.YEP_ItemCore)
+
+//--------------------------------------------------------------------------------------------------
 // Utils
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 
+/**
+ * Replace user-defined aliases with variable names
+ * @param {String} text - The text to be replaced
+ * @param {Array} regex - List of regular expressions
+ * @return {String} text - The replaced text
+ */
 dingk.EL.reformat = function(text, regex) {
 	for (let prop in regex) {
 		text = text.replace(regex[prop], prop);
@@ -1485,6 +1738,12 @@ dingk.EL.reformat = function(text, regex) {
 	return text;
 };
 
+/**
+ * Return a random integer between min and max (inclusive)
+ * @param {Number} min - Inclusive
+ * @param {Number} max - Inclusive
+ * @return {Number} Random integer between min and max (inclusive)
+ */
 dingk.EL.randomInt = function(min, max) {
 	if (max < min) {
 		let tmp = min;
