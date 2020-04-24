@@ -3,7 +3,8 @@ Imported.dingk_EquipLevels = true;
 
 var dingk = dingk || {};
 dingk.EL = dingk.EL || {};
-dingk.EL.version = 1.0;
+dingk.EL.version = '0.1.0';
+dingk.EL.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
 
 /*:
  * @plugindesc Allows weapons and armors to have levels to scale stats.
@@ -323,9 +324,15 @@ dingk.EL.version = 1.0;
  * @default MAX LEVEL
  */
 
-if (Imported.YEP_ItemCore) {
+if (!Imported.YEP_ItemCore) {
+	let msg = dingk.EL.filename + ' requires YEP_ItemCore.'
+	console.log(msg);
+	if (confirm(msg + '\n\nDownload YEP_ItemCore now?')) {
+		window.open('http://www.yanfly.moe/wiki/Item_Core_(YEP)');
+	}
+} else {
 
-dingk.EL.params = PluginManager.parameters('dingk_EquipLevels');
+dingk.EL.params = PluginManager.parameters(dingk.EL.filename);
 dingk.EL.itemDropLevelType = Number(dingk.EL.params['Item Drop Level Type']) || 0;
 dingk.EL.enableEnemyLevels = dingk.EL.params['Enable Enemy Levels'] === 'true';
 dingk.EL.EnableLevelVariance = dingk.EL.params['Enable Level Variance'] === 'true';
@@ -1402,14 +1409,18 @@ class Window_ItemEnhanceInfo extends Window_Base {
 	}
 	/** Change window visibility */
 	updateVisibility() {
-		let win = SceneManager._scene._itemActionWindow;
-		if (!win) return;
+		let actionWin = SceneManager._scene._itemActionWindow;
+		let enhanceWin = SceneManager._scene._itemEnhanceListWindow;
+		if (!actionWin) return;
 		let current = this.visible;
-		let visible = win.visible && win.currentSymbol() === 'enhance';
-		win = SceneManager._scene._itemEnhanceListWindow;
-		if (win && win.visible) visible = true;
-		this.visible = visible;
+		if ((actionWin.visible && actionWin.currentSymbol() === 'enhance') ||
+		    (enhanceWin && enhanceWin.visible)) {
+			this.show();
+		} else {
+			this.hide();
+		}
 		if (current !== this.visible) {
+			console.log(this);
 			this.refresh();
 		}
 	}
@@ -1719,8 +1730,6 @@ Window_ShopStatus.prototype.drawIndependentPossession = function(x, y) {
 
 } // if (dingk.EL.DisplayShopInfo)
 
-}; // if (Imported.YEP_ItemCore)
-
 //--------------------------------------------------------------------------------------------------
 // Utils
 //--------------------------------------------------------------------------------------------------
@@ -1752,3 +1761,5 @@ dingk.EL.randomInt = function(min, max) {
 	}
 	return Math.floor(Math.random() * (max + 1 - min)) + min;
 }
+
+}; // if (Imported.YEP_ItemCore)
