@@ -1,35 +1,40 @@
 /*******************************************************************************
- * Loot Tables v1.0 by dingk
+ * Loot Tables v1.0.0 by dingk
  * For use in RMMV 1.6.2
  ******************************************************************************/
 var Imported = Imported || {};
-Imported.dingk_ItemPools = true;
+Imported.dingk_LootTables = true;
 
 var dingk = dingk || {};
 dingk.Loot = dingk.Loot || {};
-dingk.Loot.version = '1.0';
+dingk.Loot.version = '1.0.0';
+dingk.Loot.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
 
 /*:
- * @plugindesc [v1.0] Create item/loot drop pools within the editor.
+ * @plugindesc [v1.0.0] Create item/loot drop pools within the editor.
  * @author dingk
  *
  * @param Global Loot Tables
  * @desc Pre-define some loot tables if desired, so you don't have to remake them in the Enemies editor.
  * @type struct<DropTable>[]
- * @default ["{\"Name\":\"Sample\",\"Drop Pools\":\"[\\\"{\\\\\\\"Pool Name\\\\\\\":\\\\\\\"Common\\\\\\\",\\\\\\\"Weight\\\\\\\":\\\\\\\"55\\\\\\\",\\\\\\\"Min Amount\\\\\\\":\\\\\\\"1\\\\\\\",\\\\\\\"Max Amount\\\\\\\":\\\\\\\"1\\\\\\\",\\\\\\\"Tier\\\\\\\":\\\\\\\"0\\\\\\\"}\\\",\\\"{\\\\\\\"Pool Name\\\\\\\":\\\\\\\"Rare\\\\\\\",\\\\\\\"Weight\\\\\\\":\\\\\\\"30\\\\\\\",\\\\\\\"Min Amount\\\\\\\":\\\\\\\"1\\\\\\\",\\\\\\\"Max Amount\\\\\\\":\\\\\\\"1\\\\\\\",\\\\\\\"Tier\\\\\\\":\\\\\\\"1\\\\\\\"}\\\",\\\"{\\\\\\\"Pool Name\\\\\\\":\\\\\\\"Epic\\\\\\\",\\\\\\\"Weight\\\\\\\":\\\\\\\"12\\\\\\\",\\\\\\\"Min Amount\\\\\\\":\\\\\\\"1\\\\\\\",\\\\\\\"Max Amount\\\\\\\":\\\\\\\"1\\\\\\\",\\\\\\\"Tier\\\\\\\":\\\\\\\"2\\\\\\\"}\\\",\\\"{\\\\\\\"Pool Name\\\\\\\":\\\\\\\"Legendary\\\\\\\",\\\\\\\"Weight\\\\\\\":\\\\\\\"3\\\\\\\",\\\\\\\"Min Amount\\\\\\\":\\\\\\\"1\\\\\\\",\\\\\\\"Max Amount\\\\\\\":\\\\\\\"1\\\\\\\",\\\\\\\"Tier\\\\\\\":\\\\\\\"3\\\\\\\"}\\\"]\"}"]
+ * @default ["{\"Name\":\"Sample\",\"Drop Pools\":\"[\\\"{\\\\\\\"Pool Name\\\\\\\":\\\\\\\"Common\\\\\\\",\\\\\\\"Weight\\\\\\\":\\\\\\\"55\\\\\\\",\\\\\\\"Min Amount\\\\\\\":\\\\\\\"1\\\\\\\",\\\\\\\"Max Amount\\\\\\\":\\\\\\\"1\\\\\\\"}\\\",\\\"{\\\\\\\"Pool Name\\\\\\\":\\\\\\\"Rare\\\\\\\",\\\\\\\"Weight\\\\\\\":\\\\\\\"30\\\\\\\",\\\\\\\"Min Amount\\\\\\\":\\\\\\\"1\\\\\\\",\\\\\\\"Max Amount\\\\\\\":\\\\\\\"1\\\\\\\"}\\\",\\\"{\\\\\\\"Pool Name\\\\\\\":\\\\\\\"Epic\\\\\\\",\\\\\\\"Weight\\\\\\\":\\\\\\\"12\\\\\\\",\\\\\\\"Min Amount\\\\\\\":\\\\\\\"1\\\\\\\",\\\\\\\"Max Amount\\\\\\\":\\\\\\\"1\\\\\\\"}\\\",\\\"{\\\\\\\"Pool Name\\\\\\\":\\\\\\\"Legendary\\\\\\\",\\\\\\\"Weight\\\\\\\":\\\\\\\"3\\\\\\\",\\\\\\\"Min Amount\\\\\\\":\\\\\\\"1\\\\\\\",\\\\\\\"Max Amount\\\\\\\":\\\\\\\"1\\\\\\\"}\\\"]\"}"]
  *
  * @param Plugin Command Settings
  *
- * @param Message Format
+ * @param Display Message
  * @parent Plugin Command Settings
+ * @desc Allow the game to display the message of the item drop via plugin commands.
+ * @on Yes
+ * @off No
+ * @default true
  *
- * @param Single Item
- * @parent Message Format
+ * @param Single Item Format
+ * @parent Display Message
  * @desc The text to display when using the plugin command. Leave blank for none. %1 - Icon, %2 - Name
  * @default %1%2 found!
  *
- * @param Multiple Items
- * @parent Message Format
+ * @param Multiple Items Format
+ * @parent Display Message
  * @desc The text to display when using the plugin command. Leave blank for none. %1 - Icon, %2 - Name, %3 - Count
  * @default %1%2 ×%3 found!
  *
@@ -52,11 +57,19 @@ dingk.Loot.version = '1.0';
  * -----------------------------------------------------------------------------
  *
  * In the notetags below, the keywords Item / Drop / Loot are interchangeable.
+ * For example, you can use <Item Table>, <Drop Table>, or <Loot Table>.
  *
  * Item, Weapon, and Armor Notetags:
  *
  * <Drop Pool: name>
  *  - Put this item in the specified item pool.
+ *
+ * Actor, Class, Weapon, Armor, and State Notetags:
+ *
+ * <name Weight: +n>
+ * <name Weight: -n>
+ * <name Weight: *n>
+ *  - Adjust the weight at which an loot pool drops. 
  *
  * Enemy Notetags:
  *
@@ -64,7 +77,7 @@ dingk.Loot.version = '1.0';
  *  - Assign one or more drop tables to this enemy. Customize it in the plugin
  *    manager.
  *
- * <Drop Table>
+ * <Drop Table [rate]>
  * [name]
  * [name]: [weight]
  * [name] x[amount]: [weight]
@@ -73,6 +86,9 @@ dingk.Loot.version = '1.0';
  * </Drop Table>
  *  - Add a drop table to enemy drops. Replace the bracketed variables with
  *    proper values:
+ *    - [Optional] rate : The probability that this table of items will drop.
+ *      Leave blank for 100% drop rate. Replace [rate] with a floating point
+ *      number or a percentage.
  *    - name : Name of the item or item pool. For items, you can use the names
  *      of the items or use 'Item [id]', 'Weapon [id]', or 'Armor [id]',
  *      replacing [id] with the item ID.
@@ -82,16 +98,18 @@ dingk.Loot.version = '1.0';
  *      higher the chance. Default is 1.
  *  - Insert multiple of this notetag to allow multiple drops.
  * EXAMPLE:
- * <Drop Table>
+ * <Drop Table 75%>
+ * Item 3
  * Potion x2: 5
  * Common: 5
  * Common x3-5: 4
  * Rare: 1
  * </Drop Table>
- *  - There is a chance that this enemy will drop 2 Potions, a random Common
- *    item, 3 to 5 of the same random Common item, or a random Rare item. The
- *    total weight from this drop table adds up to 15, so the Rare item has a
- *    1/15 chance to drop, whereas the two Potions has a 5/15 chance.
+ *  - There is a 75% chance that this enemy will drop an item with an ID of 3, 
+ *    2 Potions, a random Common item, 3 to 5 of the same random Common item, or
+ *    a random Rare item.
+ *  - The total weight from this drop table adds up to 16, so the Rare item has 
+ *    a 1/16 chance to drop, whereas the two Potions has a 5/16 chance.
  *
  * -----------------------------------------------------------------------------
  *   Plugin Commands
@@ -109,6 +127,33 @@ dingk.Loot.version = '1.0';
  * GiveDropTable name
  *  - Give the player an item from this item table. Replace 'name' with the name
  *    of the item table. Define this table in the plugin manager.
+ *
+ * EnableLootMessage
+ * DisableLootMessage
+ *  - Toggle the message displayed after using the commands above on or off.
+ *
+ * SingleLootMessageFormat string
+ * MultipleLootMessageFormat string
+ *  - Change the message format. Replace string with the new format.
+ *    %1 - Icon, %2 - Name, %3 - Count
+ *
+ * ResetLootMessage
+ *  - Return all loot message settings to default.
+ *
+ * -----------------------------------------------------------------------------
+ *   Compatibility
+ * -----------------------------------------------------------------------------
+ * No issues found
+ *
+ * -----------------------------------------------------------------------------
+ *   Terms of Use
+ * -----------------------------------------------------------------------------
+ * Free and commercial use and redistribution (under MIT License).
+ *
+ * -----------------------------------------------------------------------------
+ *   Changelog
+ * -----------------------------------------------------------------------------
+ * v1.0.0 - Initial release
  */
 /*~struct~DropTable:
  * @param Name
@@ -195,7 +240,7 @@ class DropPool {
 	 */
 	constructor(name, weight = 1, minAmount = 0, maxAmount = 0, level = 0, tier = 0) {
 		this.name = name;
-		this.weight = Math.max(1, Number(weight) || 1);
+		this._weight = Math.max(0, Number(weight) || 0);
 		this.minAmount = Number(minAmount) || 0;
 		this.maxAmount = Number(maxAmount) || 0;
 		if (this.minAmount > this.maxAmount) {
@@ -203,6 +248,22 @@ class DropPool {
 		}
 		this.level = level;
 		this.tier = tier;
+	}
+	/**
+	 * Set weight of pool.
+	 * @param {Number} weight - Desired weight
+	 */
+	set weight(weight) {
+		if (!weight || weight < 0) weight = 0;
+		this._weight = Number(weight) || 0;
+	}
+	/**
+	 * Get weight of pool.
+	 * @return {Number} Weight of the pool.
+	 */
+	get weight() {
+		if (this._weight < 0) this._weight = 0;
+		return this._weight;
 	}
 	/**
 	 * Return random number of items to drop
@@ -245,13 +306,14 @@ class DropTable {
 //--------------------------------------------------------------------------------------------------
 // Globals
 //--------------------------------------------------------------------------------------------------
-var itemPools = {};
-var $dropTables = {};
+dingk.Loot.Pools = {};
+dingk.Loot.Tables = {};
 
-dingk.Loot.params = PluginManager.parameters('dingk_LootTables');
-dingk.Loot.tables = dingk.Loot.params['Global Loot Tables'];
-dingk.Loot.displaySingle = dingk.Loot.params['Single Item'];
-dingk.Loot.displayMultiple = dingk.Loot.params['Multiple Items'];
+dingk.Loot.params = PluginManager.parameters(dingk.Loot.filename);
+dingk.Loot.tablesJson = dingk.Loot.params['Global Loot Tables'];
+dingk.Loot.displayMsg = dingk.Loot.params['Display Message'];
+dingk.Loot.displaySingle = dingk.Loot.params['Single Item Format'];
+dingk.Loot.displayMultiple = dingk.Loot.params['Multiple Items Format'];
 dingk.Loot.allowStack = true;
 
 //--------------------------------------------------------------------------------------------------
@@ -286,7 +348,7 @@ DataManager.isDatabaseLoaded = function() {
 
 /** Parse json */
 DataManager.process_dingk_Loot_lootTables = function() {
-	let jsonTables = JSON.parse(dingk.Loot.tables);
+	let jsonTables = JSON.parse(dingk.Loot.tablesJson);
 	for (let jsonTable of jsonTables) {
 		let table = JSON.parse(jsonTable);
 		let name = table['Name'];
@@ -297,7 +359,7 @@ DataManager.process_dingk_Loot_lootTables = function() {
 			dropTable.insert(new DropPool(obj['Pool Name'], obj['Weight'],
 				obj['Min Amount'], obj['Max Amount'], 0, obj['Tier']));
 		}
-		$dropTables[name] = dropTable;
+		dingk.Loot.Tables[name] = dropTable;
 	}
 };
 
@@ -306,8 +368,8 @@ DataManager.process_dingk_Loot_lootTables = function() {
  * @param {Array} group - List of database objects
  */
 DataManager.process_dingk_Loot_items = function(group) {
-	let alias = '(?:drop|loot|item)';
-	let regex = new RegExp('<' + alias + ' pool: (.*)>', 'i');
+	const alias = '(?:drop|loot|item)';
+	const regex = new RegExp('<' + alias + ' pool: (.*)>', 'i');
 	for (let n = 1; n < group.length; n++) {
 		let obj = group[n];
 		let notedata = obj.note.split(/[\r\n]+/);
@@ -316,8 +378,8 @@ DataManager.process_dingk_Loot_items = function(group) {
 			let result;
 			if ([, result] = note.match(regex) || '') {
 				let kind = dingk.Loot.getItemType(obj);
-				if (!itemPools[result]) itemPools[result] = [];
-				itemPools[result].push(new ItemDrop(kind, n));
+				if (!dingk.Loot.Pools[result]) dingk.Loot.Pools[result] = [];
+				dingk.Loot.Pools[result].push(new ItemDrop(kind, n));
 			}
 		}
 	}
@@ -325,10 +387,10 @@ DataManager.process_dingk_Loot_items = function(group) {
 
 /** Parse enemy notetags */
 DataManager.process_dingk_Loot_enemies = function() {
-	let group = $dataEnemies;
-	let alias = '(?:drop|loot|item) table';
-	let longLine = '\\s*(\\d*\\.?\\d+?)?(%)?(?: level)?\\s*(\\d+)?-?(\\d+)?';
-	let regex = [
+	const group = $dataEnemies;
+	const alias = '(?:drop|loot|item) table';
+	const longLine = '\\s*(\\d*\\.?\\d+?)?(%)?(?: level)?\\s*(\\d+)?-?(\\d+)?';
+	const regex = [
 		new RegExp('<' + alias + longLine + '>', 'i'),
 		new RegExp('<' + alias + longLine + ': (.*)>', 'i'),
 		new RegExp('</' + alias + '(.*)?>', 'i')
@@ -336,14 +398,13 @@ DataManager.process_dingk_Loot_enemies = function() {
 
 	for (let n = 1; n < group.length; n++) {
 		let obj = group[n];
-		let notedata = obj.note.split(/[\r\n]+/);
+		const notedata = obj.note.split(/[\r\n]+/);
 
 		let mode = '';
 		let table = [];
 		obj.dropTables = [];
 
-		for (let i = 0; i < notedata.length; i++) {
-			let note = notedata[i];
+		for (const note of notedata) {
 			let result;
 			// <drop table> <drop table rate> <drop table rate level x-y>
 			if ([, ...result] = note.match(regex[0]) || '') {
@@ -386,7 +447,7 @@ DataManager.process_dingk_Loot_enemies = function() {
 				}
 				let names = result[4].split(',').map(a => a.trim());
 				for (let name of names) {
-					let dropTable = $dropTables[name];
+					let dropTable = dingk.Loot.Tables[name];
 					if (dropTable) {
 						if (rate) dropTable.rate = rate;
 						if (minLevel) dropTable.minLevel = minLevel;
@@ -399,7 +460,6 @@ DataManager.process_dingk_Loot_enemies = function() {
 			else if (note.match(regex[2])) {
 				mode = '';
 				obj.dropTables.push(table);
-				console.log(obj.dropTables);
 				table = [];
 			} else if (mode === 'drop table') {
 				// name xmin // name xmin-max // name xmin-max: weight
@@ -430,22 +490,20 @@ DataManager.process_dingk_Loot_enemies = function() {
  * @param {Array} group - List of database objects
  */
 DataManager.process_dingk_Loot_weights = function(group) {
-	let regex = [
-		/<(.*) weight:\s*([*+-])?(\d*.?\d+?)>/i
-	];
+	const regex = /<(.*) weight:\s*([*+-])?(\d*.?\d+?)>/i;
 	for (let n = 1; n < group.length; n++) {
 		let obj = group[n];
-		let notedata = obj.note.split(/[\r\n]+/);
+		const notedata = obj.note.split(/[\r\n]+/);
 		
-		obj.lootBuffs = new Map();
+		obj.lootBuffs = {};
 		
-		for (let note of notedata) {
+		for (const note of notedata) {
 			let result;
 			// <poolName weight: +n> <poolName weight: -n> <poolName weight: *n>
-			if ([, ...result] = note.match(regex[0]) || '') {
+			if ([, ...result] = note.match(regex) || '') {
 				if (result[1] === undefined) result[1] = '+';
 				let rateAdj = {operation: result[1], rate: Number(result[2])};
-				obj.lootBuffs.set(result[0], rateAdj);
+				obj.lootBuffs[result[0]] = rateAdj;
 			}
 		}
 	}
@@ -461,19 +519,19 @@ DataManager.process_dingk_Loot_weights = function(group) {
  * @return {Array} List of weight adjustments
  */
 Game_Actor.prototype.getWeightAdjustments = function(name) {
-	let buff = [this.actor().lootBuffs.get(name)];
-	buff.push(this.currentClass().lootBuffs.get(name));
+	let buff = [this.actor().lootBuffs[name]];
+	buff.push(this.currentClass().lootBuffs[name]);
 	
 	let states = this.states();
 	for (let state of states) {
 		if (!state) continue;
-		buff.push(state.lootBuffs.get(name));
+		buff.push(state.lootBuffs[name]);
 	}
 	
 	let equips = this.equips();
 	for (let equip of equips) {
 		if (!equip) continue;
-		buff.push(equip.lootBuffs.get(name));
+		buff.push(equip.lootBuffs[name]);
 	}
 	
 	return buff;
@@ -489,6 +547,10 @@ Game_Actor.prototype.getWeightAdjustments = function(name) {
  */
 dingk.Loot.Game_Enemy_makeDropItems = Game_Enemy.prototype.makeDropItems;
 Game_Enemy.prototype.makeDropItems = function() {
+	// MOG_TrPopUpBattle compatibility patch
+	if (Imported.MOG_TrPopUpBattle && this._treasure.checked) {
+		return this._treasure.item;
+	}
 	let drops = dingk.Loot.Game_Enemy_makeDropItems.call(this);
 	if (this.enemy().dropTables) {
 		let pools = this.getDropCategory();
@@ -506,9 +568,7 @@ Game_Enemy.prototype.makeDropItems = function() {
 Game_Enemy.prototype.getDropCategory = function() {
 	let poolsToDrop = [];
 	for (let table of this.enemy().dropTables) {
-		let rand = Math.random();
-		console.log(table.rate * this.dropItemRate(), rand);
-		if (table.rate * this.dropItemRate() < rand) continue;
+		if (table.rate * this.dropItemRate() < Math.random()) continue;
 		let pool = dingk.Loot.getDropCategory(table);
 		if (pool) poolsToDrop.push(pool);
 	}
@@ -558,10 +618,22 @@ Game_Interpreter.prototype.pluginCommand = function(command, args) {
 		dingk.Loot.giveDrops(drops);
 	} else if (cmd.match(rx2)) {
 		let name = args[0];
-		let table = $dropTables[name];
+		let table = dingk.Loot.Tables[name];
 		let pool = dingk.Loot.getDropCategory(table);
 		let drops = dingk.Loot.getItemsFromPool([pool]);
 		dingk.Loot.giveDrops(drops);
+	} else if (cmd.match(/EnableLootMessage/i)) {
+		dingk.Loot.displayMsg = true;
+	} else if (cmd.match(/DisableLootMessage/i)) {
+		dingk.Loot.displayMsg = false;
+	} else if (cmd.match(/SingleLootMessageFormat/i)) {
+		dingk.Loot.displaySingle = args.join(' ');
+	} else if (cmd.match(/MultipleLootMessageFormat/i)) {
+		dingk.Loot.displayMultiple = args.join(' ');
+	} else if (cmd.match(/ResetLootMessage/i)) {
+		dingk.Loot.displayMsg = dingk.Loot.params['Display Message'];
+		dingk.Loot.displaySingle = dingk.Loot.params['Single Item Format'];
+		dingk.Loot.displayMultiple = dingk.Loot.params['Multiple Items Format'];
 	}
 };
 
@@ -658,38 +730,35 @@ dingk.Loot.getItemType = function(item) {
  */
 dingk.Loot.getItemsFromPool = function(pools, level) {
 	let drops = [];
+	let item, result;
 	for (let pool of pools) {
 		let amount = dingk.Loot.randomInt(pool.minAmount, pool.maxAmount);
 		if (dingk.ItemIds[pool.name]) {
-			for (let i = 0; i < amount; i++) {
-				drops.push($dataItems[dingk.ItemIds[pool.name]]);
-			}
+			item = $dataItems[dingk.ItemIds[pool.name]];
 		} else if (dingk.WeaponIds[pool.name]) {
-			let item = $dataWeapons[dingk.WeaponIds[pool.name]];
-			if (Imported.YEP_ItemCore && Imported.dingk_EquipLevels) {
-				let newItem = ItemManager.registerEquipLevel(item, level);
-				for (let i = 0; i < amount; i++) drops.push(newItem);
-			} else {
-				for (let i = 0; i < amount; i++) drops.push(item);
-			}
+			item = $dataWeapons[dingk.WeaponIds[pool.name]];
 		} else if (dingk.ArmorIds[pool.name]) {
-			let item = $dataArmors[dingk.ArmorIds[pool.name]];
-			if (Imported.YEP_ItemCore && Imported.dingk_EquipLevels) {
-				let newItem = ItemManager.registerEquipLevel(item, level);
-				for (let i = 0; i < amount; i++) drops.push(newItem);
-			} else {
-				for (let i = 0; i < amount; i++) drops.push(item);
+			item = $dataArmors[dingk.ArmorIds[pool.name]];
+		} else if ([, ...result] = pool.name.match(/(ITEM|WEAPON|ARMOR)\s*(\d+)/i) || '') {
+			if (result[0].match(/ITEM/i)) {
+				item = $dataItems[result[1]];
+			} else if (result[0].match(/WEAPON/i)) {
+				item = $dataWeapons[result[1]];
+			} else if (result[0].match(/ARMOR/i)) {
+				item = $dataArmors[result[1]];
 			}
 		} else {
-			let iPool = itemPools[pool.name];
+			let iPool = dingk.Loot.Pools[pool.name];
 			if (!iPool) continue;
-			let item = iPool[Math.randomInt(iPool.length)].getDataItem();
-			if (Imported.YEP_ItemCore && Imported.dingk_EquipLevels) {
-				let newItem = ItemManager.registerEquipLevel(item, level);
-				for (let i = 0; i < amount; i++) drops.push(newItem);
-			} else {
-				for (let i = 0; i < amount; i++) drops.push(item);
-			}
+			item = iPool[Math.randomInt(iPool.length)].getDataItem();
+		}
+		
+		// dingk_EquipLevels compatibility patch
+		if (Imported.YEP_ItemCore && Imported.dingk_EquipLevels && !DataManager.isItem(item)) {
+			let newItem = ItemManager.registerEquipLevel(item, level);
+			for (let i = 0; newItem && i < amount; i++) drops.push(newItem);
+		} else {
+			for (let i = 0; item && i < amount; i++) drops.push(item);
 		}
 	}
 	return drops;
@@ -703,7 +772,6 @@ dingk.Loot.getItemsFromPool = function(pools, level) {
 dingk.Loot.getDropCategory = function(table) {
 	if (!table) return;
 	let newTable = $gameParty.getWeightAdjustments(table);
-	console.log(newTable);
 	let pools = newTable.pools;
 	let totalWeight = pools.reduce((a, dp) => a + dp.weight, 0);
 	let randWeight = Math.random() * totalWeight;
@@ -751,7 +819,7 @@ dingk.Loot.giveDrops = function(drops) {
 		} else {
 			continue;
 		}
-		if (amount > 0) {
+		if (dingk.Loot.displayMsg && amount > 0) {
 			if (amount === 1) {
 				let fmt = dingk.Loot.displaySingle;
 				if (fmt) $gameMessage.add(fmt.format(icon, name));
@@ -771,11 +839,7 @@ dingk.Loot.giveDrops = function(drops) {
  * @return {Number} Random integer between min and max (inclusive)
  */
 dingk.Loot.randomInt = function(min, max) {
-	if (max < min) {
-		let tmp = min;
-		min = max;
-		max = tmp;
-	}
+	if (max < min) [min, max] = [max, min];
 	return Math.floor(Math.random() * (max + 1 - min)) + min;
 };
 
