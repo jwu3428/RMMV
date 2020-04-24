@@ -165,7 +165,7 @@ dingk.Loot.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
  */
 /*~struct~DropPool:
  * @param Pool Name
- * @desc Name of this loot pool. Use an item name to drop that item only. Use 'gold' to drop gold.
+ * @desc Name of this loot pool. Use an item name to drop that item only.
  *
  * @param Weight
  * @desc The weight of this loot pool.
