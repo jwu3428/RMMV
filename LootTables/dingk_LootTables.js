@@ -11,7 +11,7 @@ dingk.Loot.version = '1.0.0';
 dingk.Loot.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
 
 /*:
- * @plugindesc [v1.0.0] Create item/loot drop pools within the editor.
+ * @plugindesc [v1.0.0] Create randomized tier-based loot drops within the editor.
  * @author dingk
  *
  * @param Global Loot Tables
@@ -43,14 +43,17 @@ dingk.Loot.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
  *   Introduction
  * -----------------------------------------------------------------------------
  *
- * This plugin adds a randomized loot drop mechanic to your game. You can
- * customize drop tables in the plugin manager and set up various item pools.
- * You can assign these drop tables to enemies or use plugin commands on the
- * map.
+ * Do you need your enemies to drop more loot or change how the game drops
+ * items?
  *
- * Drop tables consist of different item pools, which are assigned different
+ * This plugin adds a randomized tier-based loot drop mechanic to your game. 
+ * You can customize loot tables in the plugin manager and set up various item 
+ * pools. You can assign these loot tables to enemies or use plugin commands on
+ * the map.
+ *
+ * Loot tables consist of different item pools, which are assigned different
  * weights. A pool with a higher weight has a higher chance of being selected.
- * A selected item pool will drop whatever item is assigned to it.
+ * A selected item pool will drop a random item that has been assigned to it.
  *
  * -----------------------------------------------------------------------------
  *   Notetags
@@ -61,55 +64,55 @@ dingk.Loot.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
  *
  * Item, Weapon, and Armor Notetags:
  *
- * <Drop Pool: name>
+ * <Loot Pool: name>
  *  - Put this item in the specified item pool.
+ *  - Replace 'name' with the name of the item pool.
  *
  * Actor, Class, Weapon, Armor, and State Notetags:
  *
  * <name Weight: +n>
  * <name Weight: -n>
  * <name Weight: *n>
- *  - Adjust the weight at which an loot pool drops. 
+ *  - Adjust the weight at which an item pool is selected.
+ *  - Replace 'name' with the name of the item pool.
+ *  - Replace 'n' with a number (can be floating point). 
  *
  * Enemy Notetags:
  *
- * <Drop Table: name[, name, name, ...]>
- *  - Assign one or more drop tables to this enemy. Customize it in the plugin
- *    manager.
+ * <Loot Table: name[, name, name, ...]>
+ *  - Assign one or more loot tables in a comma-separated list to this enemy.
+ *  - Replace 'name' with the name of the loot table.
  *
- * <Drop Table [rate]>
- * [name]
- * [name]: [weight]
- * [name] x[amount]: [weight]
- * [name] x[minAmount]-[maxAmount]: [weight]
+ * <Loot Table [rate]>
+ * name
+ * name: weight
+ * name x[amount]: weight
+ * name x[minAmount]-[maxAmount]: weight
  * ...
- * </Drop Table>
- *  - Add a drop table to enemy drops. Replace the bracketed variables with
- *    proper values:
- *    - [Optional] rate : The probability that this table of items will drop.
- *      Leave blank for 100% drop rate. Replace [rate] with a floating point
- *      number or a percentage.
+ * </Loot Table>
+ *  - Create a local loot table for this enemy. Replace the following variables:
+ *    - [Optional] rate : The probability that this table will drop items.
+ *      Default is 100%. Replace with a decimal or percent value.
  *    - name : Name of the item or item pool. For items, you can use the names
  *      of the items or use 'Item [id]', 'Weapon [id]', or 'Armor [id]',
  *      replacing [id] with the item ID.
- *    - amount : Number of items in this pool to drop. Default is 1.
- *    - minAmount-maxAmount : Random number of items to drop in this range.
- *    - weight: The chance for this pool to drop. The higher the weight, the
- *      higher the chance. Default is 1.
+ *    - [amount] : Number of items to drop. Default is 1.
+ *    - minAmount-maxAmount : Random range of items to drop (inclusive).
+ *    - weight : Weight of the item or item pool. Default is 1.
  *  - Insert multiple of this notetag to allow multiple drops.
  * EXAMPLE:
- * <Drop Table 75%>
+ * <Loot Table 75%>
  * Item 3
  * Potion x2: 5
  * Common: 5
  * Common x3-5: 4
  * Rare: 1
- * </Drop Table>
+ * </Loot Table>
  *  - There is a 75% chance that this enemy will drop an item with an ID of 3, 
  *    2 Potions, a random Common item, 3 to 5 of the same random Common item, or
  *    a random Rare item.
- *  - The total weight from this drop table adds up to 16, so the Rare item has 
- *    a 1/16 chance to drop, whereas the two Potions has a 5/16 chance.
+ *  - The total weight adds up to 16, so the Rare item has a 1/16 chance to drop,
+ *    whereas the two Potions have a 5/16 chance.
  *
  * -----------------------------------------------------------------------------
  *   Plugin Commands
@@ -118,15 +121,15 @@ dingk.Loot.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
  * In the plugin commands below, the keywords Item / Drop / Loot are
  * interchangeable. Customize the message displayed in the plugin manager.
  *
- * GiveDropPool name [minAmount] [maxAmount]
+ * GiveLootPool name [minAmount] [maxAmount]
  *  - Give the player an item from this item pool. Replace 'name' with the name
  *    of the item pool.
  *  - [Optional] Replace 'minAmount' and 'maxAmount' with the amount to give
  *    the player. Default is 1.
  *
- * GiveDropTable name
+ * GiveLootTable name
  *  - Give the player an item from this item table. Replace 'name' with the name
- *    of the item table. Define this table in the plugin manager.
+ *    of the item table.
  *
  * EnableLootMessage
  * DisableLootMessage
@@ -134,7 +137,7 @@ dingk.Loot.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
  *
  * SingleLootMessageFormat string
  * MultipleLootMessageFormat string
- *  - Change the message format. Replace string with the new format.
+ *  - Change the message format. Replace 'string' with the new format.
  *    %1 - Icon, %2 - Name, %3 - Count
  *
  * ResetLootMessage
@@ -157,7 +160,7 @@ dingk.Loot.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
  */
 /*~struct~DropTable:
  * @param Name
- * @desc Name of the loot table. Use <Drop Pool: name> in enemy notetags.
+ * @desc Name of the loot table. Use <Loot Pool: name> in enemy notetags.
  *
  * @param Drop Pools
  * @desc Define one or more pools.
