@@ -16,29 +16,28 @@ Stable plugins are feature-complete and are unlikely to have big changes in the 
 *Updated July 9, 2019*  
 Allow actors to perform more than one skill per turn.
 
+<h3 style='text-align: left'>
+  <a href='https://forums.rpgmakerweb.com/index.php?threads/120860/'>Loot Tables v1.0.0</a>
+  <span style='float:right'>
+    <a href='https://github.com/jwu3428/RMMV/blob/master/LootTables/dingk_LootTables.js'>Code</a>
+  </span>
+</h3>
+
+*Launched April 29, 2020*
+Create randomized tier-based loot drops within the editor. 
+
 ## Plugins in Development
 Plugins in development may have bugs and may change over time. Use at your own risk.
 
 <h3 style='text-align: left'>
-  <a href='https://forums.rpgmakerweb.com/index.php?threads/110787/'>Animation Variance v0.4</a>
+  <a href='https://forums.rpgmakerweb.com/index.php?threads/110787/'>Animation Variance v0.4.1</a>
   <span style='float: right'>
     <a href='https://raw.githubusercontent.com/jwu3428/RMMV/dev/AnimationVariance/dingk_AnimationVariance.js'>Code</a>
   </span>
 </h3>
 
-*Updated September 27, 2019*  
+*Updated April 22, 2020*  
 Allow randomized variations and custom movement in animations.
-
-<h3 style='text-align: left'>
-  Item Pools
-  <span style='float: right'>
-    <a href='https://raw.githubusercontent.com/jwu3428/RMMV/dev/ItemPools/dingk_ItemPools.js'>Code</a>
-  </span>
-</h3>
-
-*Initial upload October 25, 2019*
-*Forum post pending*
-Create item/loot drop pools within the editor.
 
 ## Planned
 There are several planned plugins below, ordered by priority of development.
