@@ -23,7 +23,7 @@ Allow actors to perform more than one skill per turn.
   </span>
 </h3>
 
-*Launched April 29, 2020*
+*Launched April 29, 2020*  
 Create randomized tier-based loot drops within the editor. 
 
 ## Plugins in Development
