@@ -1,3 +1,7 @@
+/*******************************************************************************
+ * Equipment Levels and Item Tiers v0.1.0 by dingk
+ * For use in RMMV 1.6.2
+ ******************************************************************************/
 var Imported = Imported || {};
 Imported.dingk_EquipLevels = true;
 
@@ -7,7 +11,7 @@ dingk.EL.version = '0.1.0';
 dingk.EL.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
 
 /*:
- * @plugindesc Allows weapons and armors to have levels to scale stats.
+ * @plugindesc [v0.1.0] Allows weapons and armors to have levels to scale stats.
  * @author dingk
  *
  * @param Item Drop Level Type
@@ -453,7 +457,8 @@ DataManager.process_dingk_EquipLevels_notetags2 = function(group) {
 		/<CANNOT LEVEL>/i,
 		/<DISPLAY LEVEL:\s*(TRUE|FALSE)>/i,
 		/<EQUIP (.*) FORMULA:\s*(.*)>/i,
-		/<FODDER TYPE:\s*(.*)>/i
+		/<FODDER TYPE:\s*(.*)>/i,
+		/<TRAIT (\d+) UNLOCK LEVEL (\d+)-?(\d+)?>/i
 	];
 	
 	let regEx2 = {
@@ -600,6 +605,15 @@ DataManager.process_dingk_EquipLevels_notetags2 = function(group) {
 				let types = result.split(/\s*,\s*/)
 				obj.fodderTypes = types.map(el => el.toUpperCase());
 			}
+			// <Trait i Unlock Level n>
+			else if ([, ...result] = note.match(regEx[6]) || '') {
+				if (obj.traits[result[0]]) {
+					let range = [Number(result[1])];
+					range.push(Number(result[2] || obj.maxLevel));
+					obj.traits[result[0]].unlock = range.sort((a, el) => a - el);
+					obj.traits[result[0]].locked = true;
+				}
+			}
 		}
 	}
 };
@@ -692,6 +706,7 @@ ItemManager.setEquipParameters = function(baseItem, newItem) {
 	//newItem.exp = 0;
 
 	this.updateItemName(newItem);
+	this.updateTraits(newItem);
 };
 
 /**
@@ -760,6 +775,19 @@ ItemManager.updateItemName = function(item) {
 	if (item.displayLevel && item.level > 0) {
 		let fmt = dingk.EL.DisplayFmt;
 		if (fmt) item.name = fmt.format(item.name, item.level);
+	}
+};
+
+/**
+ * Update traits on level.
+ * @param {Object} item - The independent item
+ */
+ItemManager.updateTraits = function(item) {
+	for (let trait of item.traits) {
+		if (!trait.unlock) continue;
+		if (item.level >= trait.unlock[0] && item.level <= trait.unlock[1]) {
+			trait.locked = false;
+		}
 	}
 };
 
@@ -1025,6 +1053,21 @@ Game_Actor.prototype.setup = function(actorId) {
 	console.log(equips);
 };
 */
+
+//--------------------------------------------------------------------------------------------------
+// Game_BattlerBase
+//--------------------------------------------------------------------------------------------------
+
+Game_BattlerBase.prototype.allTraits = function() {
+	return this.traitObjects().reduce(function(r, obj) {
+		let traits = [];
+		for (let trait of obj.traits) {
+			if (trait.locked) continue;
+			traits.push(trait);
+		}
+		return r.concat(traits);
+	}, []);
+};
 
 //--------------------------------------------------------------------------------------------------
 // Game_Enemy
@@ -1420,7 +1463,6 @@ class Window_ItemEnhanceInfo extends Window_Base {
 			this.hide();
 		}
 		if (current !== this.visible) {
-			console.log(this);
 			this.refresh();
 		}
 	}
@@ -1754,11 +1796,7 @@ dingk.EL.reformat = function(text, regex) {
  * @return {Number} Random integer between min and max (inclusive)
  */
 dingk.EL.randomInt = function(min, max) {
-	if (max < min) {
-		let tmp = min;
-		min = max;
-		max = tmp;
-	}
+	if (max < min) [min, max] = [max, min];
 	return Math.floor(Math.random() * (max + 1 - min)) + min;
 }
 
