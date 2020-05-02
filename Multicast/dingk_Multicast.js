@@ -9,7 +9,7 @@ Imported.dingk_Multicast = true;
 var dingk = dingk || {};
 dingk.Multicast = dingk.Multicast || {};
 dingk.Multicast.version = '1.2.0';
-dingk.Loot.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
+dingk.Multicast.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
 
 /*:
  * @plugindesc [v1.2.0] Allows an actor to select and perform multiple skills at once.
@@ -138,7 +138,7 @@ dingk.Loot.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
  *  - Initial release
  */
 
-dingk.Multicast.params = PluginManager.parameters('dingk_Multicast');
+dingk.Multicast.params = PluginManager.parameters(dingk.Multicast.filename);
 dingk.Multicast.defaultType = Number(dingk.Multicast.params['Multicast Type']) || 0;
 dingk.Multicast.finishSelect = dingk.Multicast.params['Show Finish Command'] === 'true';
 dingk.Multicast.finishText = dingk.Multicast.params['Command Text'];
