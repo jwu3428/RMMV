@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Multicast v1.2.0 by dingk
+ * Multicast v1.2.1 by dingk
  * For use in RMMV 1.6.2
  ******************************************************************************/
 
@@ -8,11 +8,11 @@ Imported.dingk_Multicast = true;
 
 var dingk = dingk || {};
 dingk.Multicast = dingk.Multicast || {};
-dingk.Multicast.version = '1.2.0';
+dingk.Multicast.version = '1.2.1';
 dingk.Multicast.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
 
 /*:
- * @plugindesc [v1.2.0] Allows an actor to select and perform multiple skills at once.
+ * @plugindesc [v1.2.1] Allows an actor to select and perform multiple skills at once.
  * @author dingk
  *
  * @param Multicast Type
@@ -39,7 +39,7 @@ dingk.Multicast.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
  * @param Command Description
  * @parent Show Finish Command
  * @desc Help description for the finish command
- * @default Finish selection and use already selected skills.
+ * @default Finish selection and use %2 selected skills.
  *
  * @help
  * -----------------------------------------------------------------------------
@@ -113,7 +113,14 @@ dingk.Multicast.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
  * -----------------------------------------------------------------------------
  *   Changelog
  * -----------------------------------------------------------------------------
- * v1.2 - Feature update
+ * v1.2.1 - Hot fix (2020-05-04)
+ *  - Fixed an issue with YEP_BattleEngineCore that caused actor and enemy 
+ *    selection to visually appear as if the user is selecting all targets when 
+ *    the first selected skill while multicasting targets all actors/enemies.
+ *  - The Finish Command will no longer show for multicast types 1 and 2 as it 
+ *    doesn't serve any purpose.
+ *  - Adjusted skill window logic.
+ * v1.2.0 - Feature update (2020-05-02)
  *  - New features:
  *    - Actors can now have multicast always active as a state
  *    - Using multicast type 1 and 2 will now show the right skill cost when 
@@ -212,6 +219,7 @@ DataManager.process_dingk_Multicast_notetags = function(group) {
 // Game_BattlerBase
 //------------------------------------------------------------------------------
 
+/** Initialize multicast variables */
 dingk.Multicast.GBB_initMembers = Game_BattlerBase.prototype.initMembers;
 Game_BattlerBase.prototype.initMembers = function() {
 	dingk.Multicast.GBB_initMembers.call(this);
@@ -221,11 +229,17 @@ Game_BattlerBase.prototype.initMembers = function() {
 	this._multicastCount = 0;
 	this._multicastCost = 1.0;
 	this._lastMulticast = null;
+	this._moveFinishCursor = false;
 	this._mcItems = [];
 	this._mcWeapons = [];
 	this._mcArmors = [];
 };
 
+/**
+ * Calculate multicast MP costs.
+ * @param {Object} skill - Skill object
+ * @return {Number} New cost
+ */
 dingk.Multicast.GBB_skillMpCost = Game_BattlerBase.prototype.skillMpCost;
 Game_BattlerBase.prototype.skillMpCost = function(skill) {
 	var mpCost = dingk.Multicast.GBB_skillMpCost.call(this, skill);
@@ -248,6 +262,11 @@ Game_BattlerBase.prototype.skillMpCost = function(skill) {
 	return mpCost;
 };
 
+/**
+ * Calculate multicast TP costs.
+ * @param {Object} skill - Skill object
+ * @return {Number} New cost
+ */
 dingk.Multicast.GBB_skillTpCost = Game_BattlerBase.prototype.skillTpCost;
 Game_BattlerBase.prototype.skillTpCost = function(skill) {
 	var tpCost = dingk.Multicast.GBB_skillTpCost.call(this, skill);
@@ -271,7 +290,12 @@ Game_BattlerBase.prototype.skillTpCost = function(skill) {
 };
 
 if (Imported.YEP_SkillCore) {
-	
+
+/**
+ * (For Yanfly's Skill Core) Calculate multicast HP costs.
+ * @param {Object} skill - Skill object
+ * @return {Number} New cost
+ */
 dingk.Multicast.GBB_skillHpCost = Game_BattlerBase.prototype.skillHpCost;
 Game_BattlerBase.prototype.skillHpCost = function(skill) {
 	var hpCost = dingk.Multicast.GBB_skillHpCost.call(this, skill);
@@ -300,36 +324,16 @@ Game_BattlerBase.prototype.skillHpCost = function(skill) {
 // Game_Battler
 //------------------------------------------------------------------------------
 
-dingk.Multicast.GB_initialize = Game_Battler.prototype.initialize;
-Game_Battler.prototype.initialize = function() {
-	dingk.Multicast.GB_initialize.call(this);
-	this._multicastStates = [];
-};
-
-Game_Battler.prototype.cancelMulticastState = function(stateId) {
-	this.removeState(stateId);
-	
-	var index = this._result.addedStates.indexOf(stateId);
-	if (index >= 0)
-		this._result.addedStates.splice(index, 1);
-	
-	index = this._result.removedStates.indexOf(stateId);
-	if (index >= 0)
-		this._result.removedStates.splice(index, 1);
-};
-
+/** Reset multicast variables */
 Game_Battler.prototype.resetMulticast = function() {
 	this._isMulticast = false;
 	this._multicastType = 0;
 	this._multicastSkills = [];
-	for (var stateId of this._multicastStates) 
-		this.cancelMulticastState(stateId);
-	this._multicastStates = [];
 	this.clearActions();
 	if (this.canMove()) {
-		var actionTimes = this.makeActionTimes();
+		let actionTimes = this.makeActionTimes();
 		this._actions = [];
-		for (var i = 0; i < actionTimes; i++) {
+		for (let i = 0; i < actionTimes; i++) {
 			this._actions.push(new Game_Action(this));
 		}
 	}
@@ -347,6 +351,11 @@ Game_Battler.prototype.resetMulticast = function() {
 
 if (Imported.YEP_X_SkillCostItems) {
 
+/**
+ * (For Skill Cost Items) Calculate multicast costs.
+ * @param {Object} skill - Skill object
+ * @return {Array} List of skills with their new costs.
+ */
 dingk.Multicast.Game_Actor_skillItemCost = Game_Actor.prototype.skillItemCost;
 Game_Actor.prototype.skillItemCost = function(skill) {
 	let arr = dingk.Multicast.Game_Actor_skillItemCost.call(this, skill);
@@ -381,6 +390,12 @@ Game_Actor.prototype.skillItemCost = function(skill) {
 // Game_Party
 //------------------------------------------------------------------------------
 
+/**
+ * (For Skill Cost Items) Revert party's items back to before multicasting
+ * @param {Array} items - Party's items
+ * @param {Array} weapons - Party's weapons
+ * @param {Array} armors - Party's armors
+ */
 Game_Party.prototype.restoreContainers = function(items, weapons, armors) {
 	if (Imported.YEP_X_SkillCostItems) {
 		this._items = JsonEx.makeDeepCopy(items);
@@ -393,43 +408,71 @@ Game_Party.prototype.restoreContainers = function(items, weapons, armors) {
 // Scene_Battle
 //------------------------------------------------------------------------------
 
+/** Keep track of skill costs when multicasting */
+Scene_Battle.prototype.trackCosts = function() {
+	let skill = this._skillWindow.item();
+	let actor = BattleManager.actor();
+	if (Imported.YEP_SkillCore)
+		this._skillWindow._remainingHp -= actor.skillHpCost(skill);
+	this._skillWindow._remainingMp -= actor.skillMpCost(skill);
+	this._skillWindow._remainingTp -= actor.skillTpCost(skill);
+	if (Imported.YEP_X_SkillCostItems) {
+		actor.paySkillItemCost(skill);
+	}
+};
+
 dingk.Multicast.SB_onActorOk = Scene_Battle.prototype.onActorOk;
 Scene_Battle.prototype.onActorOk = function() {
-	if (this._skillWindow._isMulticast) {
-		var skill = this._skillWindow.item();
-		var actor = BattleManager.actor();
-		if (Imported.YEP_SkillCore)
-			this._skillWindow._remainingHp -= actor.skillHpCost(skill);
-		this._skillWindow._remainingMp -= actor.skillMpCost(skill);
-		this._skillWindow._remainingTp -= actor.skillTpCost(skill);
-		if (Imported.YEP_X_SkillCostItems) {
-			actor.paySkillItemCost(skill);
-		}
-	}
+	if (this._skillWindow._isMulticast) this.trackCosts();
 	dingk.Multicast.SB_onActorOk.call(this);
 };
 
 dingk.Multicast.SB_onEnemyOk = Scene_Battle.prototype.onEnemyOk;
 Scene_Battle.prototype.onEnemyOk = function() {
-	if (this._skillWindow._isMulticast) {
-		var skill = this._skillWindow.item();
-		var actor = BattleManager.actor();
-		if (Imported.YEP_SkillCore)
-			this._skillWindow._remainingHp -= actor.skillHpCost(skill);
-		this._skillWindow._remainingMp -= actor.skillMpCost(skill);
-		this._skillWindow._remainingTp -= actor.skillTpCost(skill);;
-		if (Imported.YEP_X_SkillCostItems) {
-			actor.paySkillItemCost(skill);
-		}
-	}
+	if (this._skillWindow._isMulticast) this.trackCosts();
 	dingk.Multicast.SB_onEnemyOk.call(this);
+};
+
+/**
+ * When player selects multicast, setup variables
+ * @param {Object} obj - Skill or state object
+ */
+Scene_Battle.prototype.setupMulticast = function(obj) {
+	let skill = this._skillWindow.item();
+	let actor = BattleManager.actor();
+	let action = BattleManager.inputtingAction();
+	
+	actor._isMulticast = true;
+	actor._lastMulticast = skill;
+	this._skillWindow._isMulticast = true;
+	this._skillWindow._multicastSelects = 0;
+	this._skillWindow._multicastCount = obj.multicastCount - 1;
+	this._skillWindow._multicastSkills = obj.multicastSkills;
+	this._skillWindow._multicastType = obj.multicastType;
+	this._skillWindow._multicastCost = obj.multicastCost;
+	this._skillWindow._moveFinishCursor = obj.multicastType ? false : true;
+	actor._multicastSkills = obj.multicastSkills;
+	actor._multicastCount = obj.multicastCount;
+	actor._multicastType = obj.multicastType;
+	actor._multicastCost = obj.multicastCost;
+	actor._moveFinishCursor = obj.multicastType ? false : true;
+	
+	this._skillWindow._remainingHp = actor._hp;
+	this._skillWindow._remainingMp = actor._mp;
+	this._skillWindow._remainingTp = actor._tp;
+	
+	if (Imported.YEP_X_SkillCostItems) {
+		actor._mcItems = JsonEx.makeDeepCopy($gameParty._items);
+		actor._mcWeapons = JsonEx.makeDeepCopy($gameParty._weapons);
+		actor._mcArmors = JsonEx.makeDeepCopy($gameParty._armors);
+	}
 };
 
 dingk.Multicast.SB_onSkillOk = Scene_Battle.prototype.onSkillOk;
 Scene_Battle.prototype.onSkillOk = function() {
-	var skill = this._skillWindow.item();
-	var actor = BattleManager.actor();
-	var action = BattleManager.inputtingAction();
+	let skill = this._skillWindow.item();
+	let actor = BattleManager.actor();
+	let action = BattleManager.inputtingAction();
 	
 	if (skill.id === 'finish') {
 		this._skillWindow._isMulticast = false;
@@ -449,63 +492,13 @@ Scene_Battle.prototype.onSkillOk = function() {
 		for (let state of actor.states()) {
 			if (state.multicastCount && !this._skillWindow._isMulticast) {
 				if (!state.multicastSkills.includes(skill.id)) continue;
-				actor._isMulticast = true;
-				actor._lastMulticast = skill;
-				this._skillWindow._isMulticast = true;
-				this._skillWindow._multicastSelects = 0;
-				this._skillWindow._multicastCount = state.multicastCount - 1;
-				this._skillWindow._multicastSkills = state.multicastSkills;
-				this._skillWindow._multicastType = state.multicastType;
-				this._skillWindow._multicastCost = state.multicastCost;
-				actor._multicastSkills = state.multicastSkills;
-				actor._multicastCount = state.multicastCount;
-				actor._multicastType = state.multicastType;
-				actor._multicastCost = state.multicastCost;
-				
-				this._skillWindow._remainingHp = actor._hp;
-				this._skillWindow._remainingMp = actor._mp;
-				this._skillWindow._remainingTp = actor._tp;
-				
-				if (Imported.YEP_X_SkillCostItems) {
-					actor._mcItems = JsonEx.makeDeepCopy($gameParty._items);
-					actor._mcWeapons = JsonEx.makeDeepCopy($gameParty._weapons);
-					actor._mcArmors = JsonEx.makeDeepCopy($gameParty._armors);
-				}
-				
-				/*for (var i = 0; i < this._skillWindow._multicastCount; i++) {
-					actor._actions.push(new Game_Action(actor));
-				}*/
+				this.setupMulticast(state);
 			}
 		}
 	}
 	
 	if (skill.multicastCount && !this._skillWindow._isMulticast) {
-		actor._isMulticast = true;
-		actor._lastMulticast = skill;
-		this._skillWindow._isMulticast = true;
-		this._skillWindow._multicastSelects = 0;
-		this._skillWindow._multicastCount = skill.multicastCount - 1;
-		this._skillWindow._multicastSkills = skill.multicastSkills;
-		this._skillWindow._multicastType = skill.multicastType;
-		this._skillWindow._multicastCost = skill.multicastCost;
-		actor._multicastSkills = skill.multicastSkills;
-		actor._multicastCount = skill.multicastCount;
-		actor._multicastType = skill.multicastType;
-		actor._multicastCost = skill.multicastCost;
-		
-		this._skillWindow._remainingHp = actor._hp;
-		this._skillWindow._remainingMp = actor._mp;
-		this._skillWindow._remainingTp = actor._tp;
-		
-		if (Imported.YEP_X_SkillCostItems) {
-			actor._mcItems = JsonEx.makeDeepCopy($gameParty._items);
-			actor._mcWeapons = JsonEx.makeDeepCopy($gameParty._weapons);
-			actor._mcArmors = JsonEx.makeDeepCopy($gameParty._armors);
-		}
-		
-		/*for (var i = 0; i < this._skillWindow._multicastCount; i++) {
-			actor._actions.push(new Game_Action(actor));
-		}*/
+		this.setupMulticast(skill);
 		actor.setLastBattleSkill(skill);
 		this._skillWindow.refresh();
 		this._skillWindow.activate();
@@ -521,22 +514,31 @@ Scene_Battle.prototype.onSkillOk = function() {
 
 dingk.Multicast.SB_onActorCancel = Scene_Battle.prototype.onActorCancel;
 Scene_Battle.prototype.onActorCancel = function() {
-	BattleManager.actor().resetMulticast();
-	this._skillWindow.resetMulticast();
+	let actor = BattleManager.actor();
+	let win = this._skillWindow;
+	let needMove = actor._moveFinishCursor;
+	if (win._isMulticast) actor.setLastBattleSkill(actor._lastMulticast);
+	actor.resetMulticast();
+	win.resetMulticast();
 	dingk.Multicast.SB_onActorCancel.call(this);
-	this._skillWindow.refresh();
+	win.refresh();
+	if (needMove) win.select(win._index - 1);
 };
 
 dingk.Multicast.SB_onEnemyCancel = Scene_Battle.prototype.onEnemyCancel;
 Scene_Battle.prototype.onEnemyCancel = function() {
-	BattleManager.actor().resetMulticast();
-	this._skillWindow.resetMulticast();
+	let actor = BattleManager.actor();
+	let win = this._skillWindow;
+	let needMove = actor._moveFinishCursor;
+	if (win._isMulticast) actor.setLastBattleSkill(actor._lastMulticast);
+	actor.resetMulticast();
+	win.resetMulticast();
 	dingk.Multicast.SB_onEnemyCancel.call(this);
-	this._skillWindow.refresh();
+	win.refresh();
+	if (needMove) win.select(win._index - 1);
 };
 
-dingk.Multicast.SB_startActorCommandSelection = 
-	Scene_Battle.prototype.startActorCommandSelection;
+dingk.Multicast.SB_startActorCommandSelection = Scene_Battle.prototype.startActorCommandSelection;
 Scene_Battle.prototype.startActorCommandSelection = function() {
 	dingk.Multicast.SB_startActorCommandSelection.call(this);
 	let actor = BattleManager.actor();
@@ -549,25 +551,25 @@ Scene_Battle.prototype.startActorCommandSelection = function() {
 	this._skillWindow.resetMulticast();
 };
 
+/** Add new logic for multicasting */
 dingk.Multicast.SB_selectNextCommand = Scene_Battle.prototype.selectNextCommand;
 Scene_Battle.prototype.selectNextCommand = function() {
 	let skill = this._skillWindow.item();
 	let actor = BattleManager.actor();
 	let action = BattleManager.inputtingAction();
 	
+	// Track costs for skills that don't need selections
 	if (action && !action.needsSelection() && this._skillWindow._isMulticast) {
-		if (Imported.YEP_SkillCore) this._skillWindow._remainingHp -= actor.skillHpCost(skill);
-		this._skillWindow._remainingMp -= actor.skillMpCost(skill);
-		this._skillWindow._remainingTp -= actor.skillTpCost(skill);;
-		if (Imported.YEP_X_SkillCostItems) {
-			actor.paySkillItemCost(skill);
-		}
+		this.trackCosts();
 	}
 	
+	// Add new action if multicasting
 	if (this._skillWindow._multicastCount > 0) {
 		this._skillWindow._multicastCount--;
 		actor._actions.push(new Game_Action(actor));
-	} else if (this._skillWindow._isMulticast) {
+	}
+	// Else revert back to normal
+	else if (this._skillWindow._isMulticast) {
 		this._skillWindow._isMulticast = false;
 		if (actor) {
 			actor._multicastCount = 1;
@@ -575,53 +577,53 @@ Scene_Battle.prototype.selectNextCommand = function() {
 			actor.setLastBattleSkill(actor._lastMulticast);
 		}
 	}
+	// Determine next command based on multicast type
 	if (this._skillWindow._isMulticast) {
-		if (this._skillWindow._multicastType === 1) {
+		if (this._skillWindow._multicastType) {
 			BattleManager.selectNextCommand();
 			skill = this._skillWindow.item();
 			actor = BattleManager.actor();
 			action = BattleManager.inputtingAction();
 			action.setSkill(skill.id);
-			actor.setLastBattleSkill(skill);
-			this.onSelectAction();
-		} else if (this._skillWindow._multicastType === 2) {
-			BattleManager.selectNextCommand();
-			skill = this._skillWindow.item();
-			actor = BattleManager.actor();
-			action = BattleManager.inputtingAction();
-			action.setSkill(skill.id);
-			actor.setLastBattleSkill(skill);
-			if (!action.needsSelection()) {
-				this.selectNextCommand();
-			} else if (action.isForOpponent()) {
-				this.onEnemyOk();
-			} else {
-				this.onActorOk();
+			actor.setLastBattleSkill(actor._lastMulticast);
+			if (this._skillWindow._multicastType === 1) {
+				this.onSelectAction();
+			} else { // if this._skillWindow._multicastType === 2
+				if (!action.needsSelection()) {
+					this.selectNextCommand();
+				} else if (action.isForOpponent()) {
+					this.onEnemyOk();
+				} else {
+					this.onActorOk();
+				}
 			}
-		} else {
+		} else { // if this._skillWindow._multicastType === 0
 			this._helpWindow.clear();
 			this._skillWindow.show();
 			this._skillWindow.activate();
 			this._skillWindow.refresh();
 			BattleManager.selectNextCommand();
+			if (Imported.YEP_BattleEngineCore) BattleManager.stopAllSelection();
 		}
 	} else {
 		dingk.Multicast.SB_selectNextCommand.call(this);
 	}
 };
 
+/** Reset multicast settings on skill cancel */
 dingk.Multicast.SB_onSkillCancel = Scene_Battle.prototype.onSkillCancel;
 Scene_Battle.prototype.onSkillCancel = function() {
 	let win = this._skillWindow;
 	let actor = BattleManager.actor();
+	let needMove = actor._moveFinishCursor;
 	if (win._isMulticast) {
-		BattleManager.actor().resetMulticast();
+		actor.setLastBattleSkill(actor._lastMulticast);
+		actor.resetMulticast();
 		win.resetMulticast();
-		if (win._moveFinishCursor) actor.setLastBattleSkill(actor._lastMulticast);
 		win.show();
 		win.activate();
 		win.refresh();
-		if (win._moveFinishCursor) win.select(win._index - 1);
+		if (needMove) win.select(win._index - 1);
 	} else {
 		dingk.Multicast.SB_onSkillCancel.call(this);
 	}
@@ -639,9 +641,10 @@ Window_BattleSkill.prototype.initialize = function(x, y, width, height) {
 
 if (dingk.Multicast.finishSelect) {
 	
+/** If allow finish multicast, make a dummy skill to show the command */
 Window_BattleSkill.prototype.makeItemList = function() {
 	Window_SkillList.prototype.makeItemList.call(this);
-	if (this._actor && this._isMulticast) {
+	if (this._actor && this._isMulticast && !this._multicastType) {
 		let dummySkill = JsonEx.makeDeepCopy($dataSkills[1]);
 		dummySkill.id = 'finish';
 		let name = dingk.Multicast.finishText;
@@ -653,6 +656,10 @@ Window_BattleSkill.prototype.makeItemList = function() {
 	}
 };
 
+/** 
+ * Draw the dummy skill.
+ * @param {Number} index - Current skill index
+ */
 Window_BattleSkill.prototype.drawItem = function(index) {
 	let skill = this._data[index];
 	if (skill.id === 'finish') {
@@ -672,18 +679,17 @@ Window_BattleSkill.prototype.drawItem = function(index) {
 
 }; // dingk.Multicast.finishSelect
 
+/** Reset multicast variables to default */
 Window_BattleSkill.prototype.resetMulticast = function() {
 	this._isMulticast = false;
 	this._multicastSelects = 0;
 	this._multicastCount = 0;
 	this._multicastSkills = [];
-	this._multicastStates = [];
 	this._multicastType = dingk.Multicast.defaultType;
 	this._multicastCost = 1.0;
 	this._remainingHp = 0;
 	this._remainingMp = 0;
 	this._remainingTp = 0;
-	this._oldMcr = 1;
 	this._moveFinishCursor = dingk.Multicast.finishSelect;
 	if (Imported.YEP_X_SkillCostItems) {
 		this._mcItems = JsonEx.makeDeepCopy($gameParty._items);
@@ -692,6 +698,11 @@ Window_BattleSkill.prototype.resetMulticast = function() {
 	}
 };
 
+/**
+ * Check if multicast skills will exceed skill costs.
+ * @param {Object} item - Skill
+ * @return {boolean} True if actor has enough MP
+ */
 Window_BattleSkill.prototype.isEnabled = function(item) {
 	if (item.id === 'finish') {
 		if (!this._multicastSelects) return false;
