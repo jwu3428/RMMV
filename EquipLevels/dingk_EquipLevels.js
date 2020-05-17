@@ -62,6 +62,13 @@ dingk.EL.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
  * @min 1
  * @default 100
  *
+ * @param Level Restrictions
+ * @desc If enabled, actors cannot equip anything that has a higher level than them.
+ * @type boolean
+ * @on Enable
+ * @off Disable
+ * @default false
+ *
  * @param Tiers
  * @desc Manage item tiers with the highest tiers on the bottom.
  * @type struct<Tier>[]
@@ -114,12 +121,18 @@ dingk.EL.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
  * @default exp = level * 100
  *
  * @param enhancement
- * @text Allow Level Enhancement
- * @desc Allow equipment to level up by feeding EXP fodder.
- * @type boolean
- * @on Yes
- * @off No
- * @default false
+ * @text Allow EXP Gain
+ * @desc Allow equipment to level up by gaining EXP. If Level Restriction is enabled, EXP Gain is disabled.
+ * @type select
+ * @option No
+ * @value 0
+ * @option Yes, battles only
+ * @value 1
+ * @option Yes, fodder only
+ * @value 2
+ * @option Yes, both battles and fodder
+ * @value 3
+ * @default 0
  *
  * @param enhCmdName
  * @parent enhancement
@@ -136,6 +149,15 @@ dingk.EL.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
  * @min 0
  * @max 5
  * @default 1
+ *
+ * @param enhBattleExpRate
+ * @parent enhancement
+ * @text Battle EXP Rate
+ * @desc The rate at which equipment gain EXP through battles
+ * @type number
+ * @decimals 2
+ * @min 0.00
+ * @default 1.00
  *
  * @param enhCustom
  * @parent enhancement
@@ -247,7 +269,7 @@ dingk.EL.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
  *  > Set the level of the item given to the player. Place before any Give Item
  *    command.
  *
- * GiveCustomWeapon
+ * GiveCustomWeapon 
  */
 /*~struct~ParamAlias:
  * @param hp
@@ -343,6 +365,7 @@ dingk.EL.EnableLevelVariance = dingk.EL.params['Enable Level Variance'] === 'tru
 dingk.EL.LevelVarianceUp = Number(dingk.EL.params['Level Variance Increase']) || 1;
 dingk.EL.LevelVarianceDown = Number(dingk.EL.params['Level Variance Decrease']) || 1;
 dingk.EL.MaxLevel = Number(dingk.EL.params['Max Equip Level']) || 100;
+dingk.EL.LevelRestrict = dingk.EL.params['Level Restrictions'] === 'true';
 dingk.EL.Tiers = dingk.EL.params['Tiers'];
 dingk.EL.DefaultTier = Number(dingk.EL.params['Default Tier']) || 0;
 dingk.EL.HPFormula = dingk.EL.params['HP Formula'] || "hp";
@@ -355,9 +378,10 @@ dingk.EL.AGIFormula = dingk.EL.params['AGI Formula'] || "agi";
 dingk.EL.LUKFormula = dingk.EL.params['LUK Formula'] || "luk";
 dingk.EL.PriceFormula = dingk.EL.params['Price Formula'] || "price";
 dingk.EL.EXPFormula = dingk.EL.params['EXP Formula'] || "exp";
-dingk.EL.AllowEnhance = dingk.EL.params['enhancement'] === 'true';
+dingk.EL.EnhanceType = dingk.EL.LevelRestrict ? 0 : Number(dingk.EL.params['enhancement']) || 0;
 dingk.EL.EnhanceFmt = dingk.EL.params['enhCmdName'] || 'Enhance %1';
 dingk.EL.EnhancePriority = Number(dingk.EL.params['enhCmdPriority']) || 0;
+dingk.EL.BattleExpRate = Number(dingk.EL.params['enhBattleExpRate']) || 0;
 dingk.EL.EnhanceInfo = JSON.parse(dingk.EL.params['enhCustom']);
 dingk.EL.DisplayLevel = dingk.EL.params['displayLevel'] === 'true';
 dingk.EL.DisplayFmt = dingk.EL.params['levelFmtShort'];
@@ -365,13 +389,36 @@ dingk.EL.DisplayFmtFull = dingk.EL.params['levelFmtLong'];
 dingk.EL.DisplayShopInfo = dingk.EL.params['levelShopInfo'] === 'true';
 dingk.EL.Aliases = JSON.parse(dingk.EL.params['aliases']);
 
+Object.defineProperties(dingk.EL, {
+	ENHANCE_DISABLED: {
+		value: 0,
+		writable: false,
+		configurable: false
+	},
+	ENHANCE_TYPE_BATTLE: {
+		value: 1,
+		writable: false,
+		configurable: false
+	},
+	ENHANCE_TYPE_FODDER: {
+		value: 2,
+		writable: false,
+		configurable: false
+	},
+	ENHANCE_TYPE_ALL: {
+		value: 3,
+		writable: false,
+		configurable: false
+	}
+});
+
 //--------------------------------------------------------------------------------------------------
 // DataManager
 //--------------------------------------------------------------------------------------------------
 
 /**
  * Check if database is loaded, then process notetags
- * @return {bool} Whether database has loaded
+ * @return {Boolean} Whether database has loaded
  */
 dingk.EL.DataManager_isDatabaseLoaded = DataManager.isDatabaseLoaded;
 DataManager.isDatabaseLoaded = function() {
@@ -510,7 +557,7 @@ DataManager.process_dingk_EquipLevels_notetags2 = function(group) {
 		obj.exp = 0;
 		obj.maxLevel = dingk.EL.MaxLevel;
 		obj.displayLevel = dingk.EL.DisplayLevel;
-		obj.allowEnhancement = dingk.EL.AllowEnhance;
+		obj.allowEnhancement = dingk.EL.EnhanceType !== dingk.EL.ENHANCE_DISABLED;
 		obj.overrideTextColor = false;
 		obj.fodderTypes = [];
 		
@@ -645,6 +692,25 @@ DataManager.process_dingk_EquipLevels_notetagsEnemies = function() {
 				}
 			} else if (note.match(regEx[1])) {
 				obj.allowRandomTier = false;
+			}
+		}
+	}
+};
+
+//--------------------------------------------------------------------------------------------------
+// BattleManager
+//--------------------------------------------------------------------------------------------------
+
+dingk.EL.BattleManager_gainExp = BattleManager.gainExp;
+BattleManager.gainExp = function() {
+	dingk.EL.BattleManager_gainExp.call(this);
+	if (dingk.EL.isEnhanceTypeBattle()) {
+		let exp = this._rewards.exp;
+		for (let actor of $gameParty.allMembers()) {
+			for (let equip of actor.equips()) {
+				if (equip) {
+					ItemManager.itemGainExp(equip, Math.round(exp * actor.finalExpRate()));
+				}
 			}
 		}
 	}
@@ -956,10 +1022,21 @@ ItemManager.getNextItemLevel = function(item, exp) {
 /**
  * Check if item is max level
  * @param {Object} item - The independent item
- * @return {bool} Whether the item is max level or not
+ * @return {Boolean} Whether the item is max level or not
  */
 ItemManager.isMaxLevel = function(item) {
 	return item.level >= item.maxLevel;
+};
+
+/**
+ * Set the tier of the equipment
+ * @param {Object} item - The independent item
+ * @param {Number} tier - The desired tier
+ */
+ItemManager.setTier = function(item, tier) {
+	item.tier = Math.round(tier).clamp(0, item.maxTier);
+	console.log(item.tier);
+	this.setEquipParameters(DataManager.getBaseItem(item), item);
 };
 
 /**
@@ -967,8 +1044,7 @@ ItemManager.isMaxLevel = function(item) {
  * @param {Object} item - The independent item
  */
 ItemManager.itemTierUp = function(item) {
-	item.tier++;
-	this.setEquipParameters(DataManager.getBaseItem(item), item);
+	this.setTier(item, item.tier + 1);
 };
 
 /**
@@ -976,8 +1052,7 @@ ItemManager.itemTierUp = function(item) {
  * @param {Object} item - The independent item
  */
 ItemManager.itemTierDown = function(item) {
-	item.tier--;
-	this.setEquipParameters(DataManager.getBaseItem(item), item);
+	this.setTier(item, item.tier - 1);
 };
 
 /**
@@ -990,18 +1065,15 @@ ItemManager.setRandomTier = function(item) {
 	for (let i = minTier; i < item.maxTier; i++) {
 		totalWeight += dingk.EL.Tiers[i].weight;
 	}
-	console.log(totalWeight);
 	let randWeight = Math.random() * totalWeight;
 	let accWeight = 0;
 	for (let i = minTier; i < dingk.EL.Tiers.length; i++) {
 		accWeight += dingk.EL.Tiers[i].weight;
 		if (randWeight < accWeight) {
-			console.log(randWeight, accWeight);
-			item.tier = i;
+			this.setTier(item, i);
 			break;
 		}
 	}
-	this.setEquipParameters(DataManager.getBaseItem(item), item);
 };
 
 /**
@@ -1054,10 +1126,58 @@ Game_Actor.prototype.setup = function(actorId) {
 };
 */
 
+/**
+ * Check if the actor can equip this weapon, including level restrictions.
+ * @param {Object} item - The current weapon
+ * @return {Boolean} True if can equip
+ */
+/*
+Game_Actor.prototype.canEquipWeapon = function(item) {
+	let canEquip = Game_BattlerBase.prototype.canEquipWeapon.call(this, item);
+	if (dingk.EL.LevelRestrict) {
+		if (!item.level) return canEquip;
+		if (item.level > this.level) return false;
+	}
+	return canEquip;
+};
+
+/**
+ * Check if the actor can equip this armor, including level restrictions.
+ * @param {Object} item - The current armor
+ * @return {Boolean} True if can equip
+ */
+ /*
+Game_Actor.prototype.canEquipArmor = function(item) {
+	let canEquip = Game_BattlerBase.prototype.canEquipArmor.call(this, item);
+	if (dingk.EL.LevelRestrict) {
+		if (!item.level) return canEquip;
+		if (item.level > this.level) return false;
+	}
+	return canEquip;
+};
+*/
+
+/**
+ * If equipment level too high, return negative performance score. Otherwise, use default.
+ * @param {Object} item - The equipment
+ * @return {Number} The performance value
+ */
+dingk.EL.GA_calcEquipItemPerformance = Game_Actor.prototype.calcEquipItemPerformance;
+Game_Actor.prototype.calcEquipItemPerformance = function(item) {
+	if (dingk.EL.LevelRestrict && item.level > this.level) {
+		return -1000;
+	}
+	return dingk.EL.GA_calcEquipItemPerformance.call(this, item);
+};
+
 //--------------------------------------------------------------------------------------------------
 // Game_BattlerBase
 //--------------------------------------------------------------------------------------------------
 
+/**
+ * Return a list of all traits of this battler. Determine if trait is level-locked.
+ * @return {Array} List of all traits
+ */
 Game_BattlerBase.prototype.allTraits = function() {
 	return this.traitObjects().reduce(function(r, obj) {
 		let traits = [];
@@ -1081,6 +1201,7 @@ Game_BattlerBase.prototype.allTraits = function() {
  */
 dingk.EL.GE_itemObject = Game_Enemy.prototype.itemObject;
 Game_Enemy.prototype.itemObject = function(kind, dataId) {
+	console.log('here');
 	let baseItem = dingk.EL.GE_itemObject.call(this, kind, dataId);
 	if (!DataManager.isIndependent(baseItem)) return baseItem;
 	let newItem = DataManager.registerNewItem(baseItem);
@@ -1113,26 +1234,39 @@ Game_Enemy.prototype.itemObject = function(kind, dataId) {
 dingk.EL.GI_pluginCommand = Game_Interpreter.prototype.pluginCommand;
 Game_Interpreter.prototype.pluginCommand = function(command, args) {
 	dingk.EL.GI_pluginCommand.call(this, command, args);
+	// GiveCustomWeapon id level tier
 	if (command.toUpperCase().trim() === 'GIVECUSTOMWEAPON') {
 		let itemId = Number(args[0]);
 		let itemLevel = Number(args[1]);
+		let itemTier = Number(args[2]);
 		let baseItem = $dataWeapons[itemId];
 		if (!DataManager.isIndependent(baseItem)) $gameParty.gainItem(baseItem);
 		else {
 			let newItem = DataManager.registerNewItem(baseItem);
 			if (itemLevel) ItemManager.setLevel(newItem, itemLevel);
-			ItemManager.setEquipParameters(baseItem, newItem);
+			if (itemTier)  {
+				ItemManager.setTier(newItem, itemTier);
+			} else {
+				ItemManager.setEquipParameters(baseItem, newItem);
+			}
 			$gameParty.registerNewItem(baseItem, newItem);
 		}
-	} else if (command.toUpperCase().trim() === 'GIVECUSTOMARMOR') {
+	}
+	// GiveCustomArmor id level tier
+	else if (command.toUpperCase().trim() === 'GIVECUSTOMARMOR') {
 		let itemId = Number(args[0]);
 		let itemLevel = Number(args[1]);
+		let itemTier = Number(args[2]);
 		let baseItem = $dataArmors[itemId];
 		if (!DataManager.isIndependent(baseItem)) $gameParty.gainItem(baseItem);
 		else {
 			let newItem = DataManager.registerNewItem(baseItem);
 			if (itemLevel) ItemManager.setLevel(newItem, itemLevel);
-			ItemManager.setEquipParameters(baseItem, newItem);
+			if (itemTier)  {
+				ItemManager.setTier(newItem, itemTier);
+			} else {
+				ItemManager.setEquipParameters(baseItem, newItem);
+			}
 			$gameParty.registerNewItem(baseItem, newItem);
 		}
 	}
@@ -1280,7 +1414,7 @@ Scene_Item.prototype.onItemEnhanceListOk = function() {
  * @param {Number} x
  * @param {Number} y
  * @param {Number} width
- * @param {bool} full
+ * @param {Boolean} full
  */
 Window_Base.prototype.drawItemNameWithLevel = function(item, x, y, width, full) {
 	width = width || 312;
@@ -1308,6 +1442,7 @@ Window_Base.prototype.setItemTextColor = function(item) {
 	dingk.EL.Window_Base_setItemTextColor.call(this, item);
 	if (item.tier === undefined || item.tier < 0) return;
 	if (item.overrideTextColor) return;
+	console.log(item.tier);
 	this._resetTextColor = dingk.EL.Tiers[item.tier].color;
 };
 
@@ -1328,6 +1463,28 @@ Window_Base.prototype.textColor = function(n) {
 		}
 	} else {
 		return dingk.EL.Window_Base_textColor.call(this, n);
+	}
+};
+
+//--------------------------------------------------------------------------------------------------
+// Window_EquipItem
+//--------------------------------------------------------------------------------------------------
+
+dingk.EL.Window_EquipItem_isEnabled = Window_EquipItem.prototype.isEnabled;
+Window_EquipItem.prototype.isEnabled = function(item) {
+	if (!item) return false;
+	let isEnabled = dingk.EL.Window_EquipItem_isEnabled.call(this, item);
+	if (dingk.EL.LevelRestrict) {
+		if (!item.level) return isEnabled;
+		if (item.level > this._actor.level) return false;
+	}
+	return isEnabled;
+};
+
+Window_EquipItem.prototype.processOk = function() {
+	Window_Selectable.prototype.processOk.call(this);
+	if (!this.isCurrentItemEnabled()) {
+		
 	}
 };
 
@@ -1385,20 +1542,20 @@ switch(dingk.EL.EnhancePriority) {
 
 /**
  * Check if item can be enhanced
- * @return {bool} Whether or not the item can be enhanced
+ * @return {Boolean} Whether or not the item can be enhanced
  */
 Window_ItemActionCommand.prototype.isAddItemEnhanceCommand = function() {
 	if (!this._item) return false;
-	return this._item.allowEnhancement;
+	return this._item.allowEnhancement && dingk.EL.isEnhanceTypeFodder();
 };
 
 /**
  * Check if item can be enhanced
- * @return {bool} Whether or not the item can be enhanced
+ * @return {Boolean} Whether or not the item can be enhanced
  */
 Window_ItemActionCommand.prototype.isEnableItemEnhanceCommand = function() {
 	if (ItemManager.isMaxLevel(this._item)) return false;
-	return this._item.allowEnhancement;
+	return this._item.allowEnhancement && dingk.EL.isEnhanceTypeFodder();
 }
 
 /** Add item enhance command */
@@ -1656,7 +1813,7 @@ class Window_ItemEnhanceList extends Window_ItemList {
 	/**
 	 * Check if item is a fodder
 	 * @param {Object} item - Current item
-	 * @return {bool} Whether item is fodder or not
+	 * @return {Boolean} Whether item is fodder or not
 	 */
 	includes(item) {
 		if (!item || !this._item) return false;
@@ -1775,6 +1932,24 @@ Window_ShopStatus.prototype.drawIndependentPossession = function(x, y) {
 //--------------------------------------------------------------------------------------------------
 // Utils
 //--------------------------------------------------------------------------------------------------
+
+/**
+ * Return whether or not equipment enhance type is fodder type
+ * @return {Boolean} true if fodder type
+ */
+dingk.EL.isEnhanceTypeFodder = function() {
+	let arr = [dingk.EL.ENHANCE_TYPE_ALL, dingk.EL.ENHANCE_TYPE_FODDER];
+	return arr.includes(dingk.EL.EnhanceType);
+};
+
+/**
+ * Return whether or not equipment enhance type is battle type
+ * @return {Boolean} true if battle type
+ */
+dingk.EL.isEnhanceTypeBattle = function() {
+	let arr = [dingk.EL.ENHANCE_TYPE_ALL, dingk.EL.ENHANCE_TYPE_BATTLE];
+	return arr.includes(dingk.EL.EnhanceType);
+};
 
 /**
  * Replace user-defined aliases with variable names
