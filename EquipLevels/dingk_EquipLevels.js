@@ -2060,7 +2060,7 @@ class Scene_Upgrade extends Scene_Item {
 	}
 	createActionWindow() {}
 	onItemOk() {
-		this._equipUpgradeConfirmWindow.setItem(item);
+		this._equipUpgradeConfirmWindow.setItem(this.item());
 		this._equipUpgradeConfirmWindow.open();
 		this._equipUpgradeConfirmWindow.activate();
 		this._equipUpgradeConfirmWindow.select(0);
@@ -2972,14 +2972,12 @@ Window_ShopBuy.prototype.makeItemList = function() {
 // Window_ShopStatus
 //--------------------------------------------------------------------------------------------------
 
-if (dingk.EL.DisplayShopInfo) {
-
 /** Refresh shop window */
 Window_ShopStatus.prototype.refresh = function() {
 	this.contents.clear();
 	if (this._item) {
 		let displayItem = this._item;
-		let baseItem, savedItem;
+		let baseItem;
 		if (displayItem.isDisplay) {
 			this._item = displayItem.database[displayItem.baseItemId];
 		}
@@ -2988,12 +2986,15 @@ Window_ShopStatus.prototype.refresh = function() {
 		let x = this.textPadding();
 		let y = this.lineHeight();
 		let w = this.contents.width - this.textPadding() * 2;
-		if (displayItem.level) {
-			this.drawItemNameWithLevel(displayItem, x, 0, w, true);
-		} else {
-			this.drawItemName(displayItem, x, 0, w);
+		let possWidth = this.drawPossession(x, 0);
+		if (dingk.EL.DisplayShopInfo) {
+			if (possWidth) w -= (possWidth + this.textWidth(' '));
+			if (displayItem.level) {
+				this.drawItemNameWithLevel(displayItem, x, 0, w, true);
+			} else {
+				this.drawItemName(displayItem, x, 0, w);
+			}
 		}
-		this.drawPossession(x, 0);
 		if (this.isEquipItem()) {
 			this.resetTextColor();
 			this.resetFontSettings();
@@ -3011,24 +3012,26 @@ Window_ShopStatus.prototype.refresh = function() {
 	}
 };
 
+if (dingk.EL.DisplayShopInfo) {
+
 /** Draw possession count */
 Window_ShopStatus.prototype.drawPossession = function(x, y) {
 	let width = this.contents.width - this.textPadding() - x;
 	if (DataManager.isIndependent(this._item) || this._item.isDisplay) {
 		return this.drawIndependentPossession(x, y);
 	}
-	let value = $gameParty.numItems(this._item);
-	value = Yanfly.Util.toGroup(value);
-	this.drawText('\u00d7' + value, x, y, width, 'right');
+	let text = '\u00d7' + $gameParty.numItems(this._item);
+	this.drawText(text, x, y, width, 'right');
+	return this.textWidth(text);
 };
 
 /** Draw possession count */
 Window_ShopStatus.prototype.drawIndependentPossession = function(x, y) {
 	let width = this.contents.width - this.textPadding() - x;
 	let baseItem = DataManager.getBaseItem(this._item);
-	let value = $gameParty.numIndependentItems(baseItem);
-	value = Yanfly.Util.toGroup(value);
-	this.drawText('\u00d7' + value, x, y, width, 'right');
+	let text = '\u00d7' + $gameParty.numIndependentItems(baseItem);
+	this.drawText(text, x, y, width, 'right');
+	return this.textWidth(text);
 };
 
 } // if (dingk.EL.DisplayShopInfo)
@@ -3037,6 +3040,11 @@ Window_ShopStatus.prototype.drawIndependentPossession = function(x, y) {
 // Utils
 //--------------------------------------------------------------------------------------------------
 
+/**
+ * Get item database
+ * @param {Number} type
+ * @return {Array} Database
+ */
 dingk.EL.getDatabase = function(type) {
 	switch(type) {
 		default:
