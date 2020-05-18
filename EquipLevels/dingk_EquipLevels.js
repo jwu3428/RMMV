@@ -1482,6 +1482,11 @@ ItemManager.onTierEval = function(item) {
 	}
 };
 
+/**
+ * Run level condition code.
+ * @param {Object} item - The item that's being leveled
+ * @return {boolean} Result of the code
+ */
 ItemManager.levelConditionEval = function(item) {
 	if (!item.level) return false;
 	let s = $gameSwitches._data;
@@ -1496,7 +1501,13 @@ ItemManager.levelConditionEval = function(item) {
 	return result;
 };
 
+/**
+ * Run tier condition code.
+ * @param {Object} item - The item that's being upgraded
+ * @return {boolean} Result of the code
+ */
 ItemManager.tierConditionEval = function(item) {
+	if (!item.tierUpgradeData) return false;
 	if (!item.tierUpgradeData[item.tier]) return false;
 	if (!item.tierConditionEval) return true;
 	let s = $gameSwitches._data;
@@ -1509,6 +1520,23 @@ ItemManager.tierConditionEval = function(item) {
 		return false;
 	}
 	return result;
+};
+
+/**
+ * Check if item meets the material and cost requirements to upgrade
+ * @param {Object} item - The equip to be upgraded
+ * @return {boolean} True if meets requirements
+ */
+ItemManager.canUpgrade = function(item) {
+	if (!item) return false;
+	if (!this.tierConditionEval(item)) return false;
+	let data = item.tierUpgradeData[item.tier];
+	if (data.cost > $gameParty.gold()) return false;
+	for (let mat of data.mats) {
+		let item = dingk.EL.getDatabase(mat.kind)[mat.id];
+		if (mat.count > $gameParty.numItems(item)) return false;
+	}
+	return true;
 };
 
 /**
@@ -1600,46 +1628,6 @@ Game_System.prototype.isTierUpgradeEnabled = function() {
 //--------------------------------------------------------------------------------------------------
 // Game_Actor
 //--------------------------------------------------------------------------------------------------
-
-/*
-dingk.EL.Game_Actor_setup = Game_Actor.prototype.setup;
-Game_Actor.prototype.setup = function(actorId) {
-	dingk.EL.Game_Actor_setup.call(this, actorId);
-	let equips = this.convertInitEquips($dataActors[actorId].equips);
-	console.log(equips);
-};
-*/
-
-/**
- * Check if the actor can equip this weapon, including level restrictions.
- * @param {Object} item - The current weapon
- * @return {Boolean} True if can equip
- */
-/*
-Game_Actor.prototype.canEquipWeapon = function(item) {
-	let canEquip = Game_BattlerBase.prototype.canEquipWeapon.call(this, item);
-	if (dingk.EL.LevelRestrict) {
-		if (!item.level) return canEquip;
-		if (item.level > this.level) return false;
-	}
-	return canEquip;
-};
-
-/**
- * Check if the actor can equip this armor, including level restrictions.
- * @param {Object} item - The current armor
- * @return {Boolean} True if can equip
- */
- /*
-Game_Actor.prototype.canEquipArmor = function(item) {
-	let canEquip = Game_BattlerBase.prototype.canEquipArmor.call(this, item);
-	if (dingk.EL.LevelRestrict) {
-		if (!item.level) return canEquip;
-		if (item.level > this.level) return false;
-	}
-	return canEquip;
-};
-*/
 
 /**
  * If equipment level too high, return negative performance score. Otherwise, use default.
@@ -2269,14 +2257,20 @@ class Window_EquipUpgradeConfirm extends Window_Command {
 		this.deactivate();
 		this.openness = 0;
 		this.width = Graphics.boxWidth;
-		this.height = Graphics.boxHeight;
+		this.height = this.lineHeight() * 16;
+		this.y = (Graphics.boxHeight - this.height) / 2;
 	}
+	/**
+	 * Set current item and draw name
+	 * @param {Object} item - The currently selected item
+	 */
 	setItem(item) {
 		this.refresh();
 		let dx = 0;
 		let dy = 0;
 		let dw = this.contentsWidth();
 		this.drawText(dingk.EL.EUCWindowMessage, dx, dy, dw, 'center');
+		dy += this.lineHeight() * 2;
 		
 		let database = DataManager.getDatabase(item);
 		let container = DataManager.getContainer(item);
@@ -2284,21 +2278,36 @@ class Window_EquipUpgradeConfirm extends Window_Command {
 		let dummyItem = DataManager.registerNewItem(baseItem);
 		ItemManager.setLevel(dummyItem, item.level);
 		ItemManager.setTier(dummyItem, item.tier + 1);
-		console.log(DataManager.getDatabase(item), DataManager.getContainer(item));
 		
-		this.drawEquipNames(item, dummyItem);
+		dy = this.drawEquipNames(item, dummyItem, dx, dy);
+		this.drawEquipParams(item, dummyItem, dx + this.textPadding(), dy);
 		DataManager.removeIndependentItem(dummyItem);
 		database.pop();
 		container.pop();
-		console.log(DataManager.getDatabase(item), DataManager.getContainer(item), container.length);
 	}
-	drawEquipNames(item, newItem) {
-		let dx = 0;
-		let dy = this.lineHeight() * 2;
-		let dw = this.width / 2;
+	drawEquipNames(item, newItem, dx, dy) {
+		let dw = this.contentsWidth() / 2;
 		
 		this.drawItemName(item, dx, dy, dw);
 		this.drawItemName(newItem, dw, dy, dw);
+		return dy + this.lineHeight() * 2;
+	}
+	drawEquipParams(item, newItem, dx, dy) {
+		let dw = (this.contentsWidth() - this.textPadding() * 2) / 2;
+		
+		for (let i = 0; i < 8; i++) {
+			this.drawDarkRect(0, dy, this.contentsWidth(), this.lineHeight());
+			this.changeTextColor(this.systemColor());
+			this.drawText(TextManager.param(i), dx, dy, dw, 'left');
+			this.changeTextColor(this.normalColor());
+			this.drawText(item.params[i], dx, dy, dw, 'right');
+			this.changeTextColor(this.systemColor());
+			this.drawText(' \u2192', dx + dw, dy, dw, 'left');
+			this.changeTextColor(this.paramchangeTextColor(newItem.params[i] - item.params[i]));
+			this.drawText(newItem.params[i], dx + dw, dy, dw, 'right');
+			this.changeTextColor(this.normalColor());
+			dy += this.lineHeight();
+		}
 	}
 	itemTextAlign() {
 		return 'center';
@@ -2445,7 +2454,7 @@ Window_ItemActionCommand.prototype.isAddEquipUpgradeCommand = function() {
  * @return {Boolean} Whether or not the equipment can be upgraded
  */
 Window_ItemActionCommand.prototype.isEnableEquipUpgradeCommand = function() {
-	return ItemManager.tierConditionEval(this._item);
+	return ItemManager.canUpgrade(this._item);
 }
 
 /** Add equip upgrade command */
@@ -2581,8 +2590,7 @@ class Window_ItemEnhanceInfo extends Window_ItemInfo {
 				for (let i = 0; i < 8; i++) {
 					let currParam = this._item.params[i];
 					if (currParam !== params[i]) {
-						this.drawDarkRect(0, dy, this.contentsWidth(), 
-							this.lineHeight());
+						this.drawDarkRect(0, dy, this.contentsWidth(), this.lineHeight());
 						this.changeTextColor(this.systemColor());
 						this.drawText(TextManager.param(i), dx, dy, dw, 'left');
 						this.resetFontSettings();
@@ -2881,15 +2889,9 @@ class Window_EquipUpgradeList extends Window_ItemList {
 		this.initialize.apply(this, arguments);
 	}
 	/**
-	 * Initialize window properties
-	 * @param {Number} x - The x position
-	 * @param {Number} y - The y position
-	 * @param {Number} w - Window width
-	 * @param {Number} h - Window height
+	 * Set this window's info box
+	 * @param {Object} win - Equip upgrade info window
 	 */
-	initialize(x, y, w, h) {
-		super.initialize.call(this, x, y, w, h);
-	}
 	setInfoWindow(win) {
 		this._equipUpgradeInfoWindow = win;
 	}
@@ -2900,7 +2902,7 @@ class Window_EquipUpgradeList extends Window_ItemList {
 	 */
 	includes(item) {
 		let include = super.includes(item);
-		if (dingk.EL.PCSettings['upScene']) return this.isEnabled(item) && include;
+		if (dingk.EL.PCSettings['upScene']) return ItemManager.tierConditionEval(item) && include;
 		return include;
 	}
 	/**
@@ -2909,12 +2911,9 @@ class Window_EquipUpgradeList extends Window_ItemList {
 	 * @return {boolean} True if can be upgraded
 	 */
 	isEnabled(item) {
-		if (!item) return false;
-		if (!dingk.EL.isEmpty(item.tierUpgradeData)) {
-			return ItemManager.tierConditionEval(item) && !!item.tierUpgradeData[item.tier];
-		}
-		return false;
+		return ItemManager.canUpgrade(item);
 	}
+	/** Update info box */
 	updateHelp() {
 		super.updateHelp();
 		if (!this._equipUpgradeInfoWindow) return;
@@ -2946,6 +2945,7 @@ if (!dingk.EL.DisplayLevel) {
 // Window_ShopBuy
 //--------------------------------------------------------------------------------------------------
 
+/** Replace equipment with a display item that shows level and proper stats */
 dingk.EL.Window_ShopBuy_makeItemList = Window_ShopBuy.prototype.makeItemList;
 Window_ShopBuy.prototype.makeItemList = function() {
 	dingk.EL.Window_ShopBuy_makeItemList.call(this);
@@ -3014,7 +3014,12 @@ Window_ShopStatus.prototype.refresh = function() {
 
 if (dingk.EL.DisplayShopInfo) {
 
-/** Draw possession count */
+/**
+ * Draw possession count
+ * @param {Number} x
+ * @param {Number} y
+ * @return {Number} Text width of possession text
+ */
 Window_ShopStatus.prototype.drawPossession = function(x, y) {
 	let width = this.contents.width - this.textPadding() - x;
 	if (DataManager.isIndependent(this._item) || this._item.isDisplay) {
@@ -3025,7 +3030,12 @@ Window_ShopStatus.prototype.drawPossession = function(x, y) {
 	return this.textWidth(text);
 };
 
-/** Draw possession count */
+/**
+ * Draw possession count of independent items
+ * @param {Number} x
+ * @param {Number} y
+ * @return {Number} Text width of possession text
+ */
 Window_ShopStatus.prototype.drawIndependentPossession = function(x, y) {
 	let width = this.contents.width - this.textPadding() - x;
 	let baseItem = DataManager.getBaseItem(this._item);
