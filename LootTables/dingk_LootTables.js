@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Loot Tables v1.0.0 by dingk
+ * Loot Tables v1.0.1 by dingk
  * For use in RMMV 1.6.2
  ******************************************************************************/
 var Imported = Imported || {};
@@ -7,11 +7,11 @@ Imported.dingk_LootTables = true;
 
 var dingk = dingk || {};
 dingk.Loot = dingk.Loot || {};
-dingk.Loot.version = '1.0.0';
+dingk.Loot.version = '1.0.1';
 dingk.Loot.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
 
 /*:
- * @plugindesc [v1.0.0] Create randomized tier-based loot drops within the editor.
+ * @plugindesc [v1.0.1] Create randomized tier-based loot drops within the editor.
  * @author dingk
  *
  * @param Global Loot Tables
@@ -156,6 +156,7 @@ dingk.Loot.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
  * -----------------------------------------------------------------------------
  *   Changelog
  * -----------------------------------------------------------------------------
+ * v1.0.1 - Compatibility patch for Moghunter's Treasure Popup
  * v1.0.0 - Initial release
  */
 /*~struct~DropTable:
@@ -613,6 +614,7 @@ Game_Interpreter.prototype.pluginCommand = function(command, args) {
 	let alias = '(?:drop|loot|item)';
 	let rx1 = new RegExp('give' + alias + 'pool', 'i');
 	let rx2 = new RegExp('give' + alias + 'table', 'i');
+	dingk.Loot._event = $gameMap.event(this._eventId);
 	if (cmd.match(rx1)) {
 		let amountLo = Number(args[1]) || 1;
 		let amountHi = Number(args[2]) || amountLo;
@@ -638,6 +640,7 @@ Game_Interpreter.prototype.pluginCommand = function(command, args) {
 		dingk.Loot.displaySingle = dingk.Loot.params['Single Item Format'];
 		dingk.Loot.displayMultiple = dingk.Loot.params['Multiple Items Format'];
 	}
+	dingk.Loot._event = undefined;
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -832,6 +835,14 @@ dingk.Loot.giveDrops = function(drops) {
 			}
 		}
 		$gameParty.gainItem(item, 1);
+		
+		// Moghunter Treasure Popup compatibility patch
+		if (Imported.MOG_TreasurePopup && $gameSystem._trspupVisible) {
+			if (amount > 0 && SceneManager._scene instanceof Scene_Map) {
+				let [x, y] = [this._event.screenX(), this._event.screenY()];
+				$gameSystem._trspupData.push([item, amount, x, y]);
+			}
+		}
 	}
 };
 
@@ -846,11 +857,3 @@ dingk.Loot.randomInt = function(min, max) {
 	return Math.floor(Math.random() * (max + 1 - min)) + min;
 };
 
-/**
- * Eval but faster
- * @param {String} code - Javascript code
- * @return Some value
- */
-dingk.Loot.eval = function(code) {
-	return Function('return ' + code)();
-};
