@@ -17,13 +17,13 @@ Stable plugins are feature-complete and are unlikely to have big changes in the 
 Allow actors to perform more than one skill per turn.
 
 <h3 style='text-align: left'>
-  <a href='https://forums.rpgmakerweb.com/index.php?threads/120860/'>Loot Tables v1.0.0</a>
+  <a href='https://forums.rpgmakerweb.com/index.php?threads/120860/'>Loot Tables v1.0.1</a>
   <span style='float:right'>
     <a href='https://github.com/jwu3428/RMMV/blob/master/LootTables/dingk_LootTables.js'>Code</a>
   </span>
 </h3>
 
-*Launched April 29, 2020*  
+*Updated July 5, 2021*  
 Create randomized tier-based loot drops within the editor. 
 
 ## Plugins in Development
