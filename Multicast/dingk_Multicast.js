@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Multicast v1.2.1 by dingk
+ * Multicast v1.2.2 by dingk
  * For use in RMMV 1.6.2
  ******************************************************************************/
 
@@ -8,11 +8,11 @@ Imported.dingk_Multicast = true;
 
 var dingk = dingk || {};
 dingk.Multicast = dingk.Multicast || {};
-dingk.Multicast.version = '1.2.1';
+dingk.Multicast.version = '1.2.2';
 dingk.Multicast.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
 
 /*:
- * @plugindesc [v1.2.1] Allows an actor to select and perform multiple skills at once.
+ * @plugindesc [v1.2.2] Allows an actor to select and perform multiple skills at once.
  * @author dingk
  *
  * @param Multicast Type
@@ -113,6 +113,9 @@ dingk.Multicast.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
  * -----------------------------------------------------------------------------
  *   Changelog
  * -----------------------------------------------------------------------------
+ * v1.2.2 - Bug fix (2021-09-17)
+ *  - Fixed an bug that caused the game to crash when trying to select a skill 
+ *    when the actor has not learned any.
  * v1.2.1 - Hot fix (2020-05-04)
  *  - Fixed an issue with YEP_BattleEngineCore that caused actor and enemy 
  *    selection to visually appear as if the user is selecting all targets when 
@@ -662,7 +665,7 @@ Window_BattleSkill.prototype.makeItemList = function() {
  */
 Window_BattleSkill.prototype.drawItem = function(index) {
 	let skill = this._data[index];
-	if (skill.id === 'finish') {
+	if (skill && skill.id === 'finish') {
 		let rect = this.itemRect(index);
 		rect.width -= this.textPadding();
 		this.changePaintOpacity(1);
@@ -704,13 +707,14 @@ Window_BattleSkill.prototype.resetMulticast = function() {
  * @return {boolean} True if actor has enough MP
  */
 Window_BattleSkill.prototype.isEnabled = function(item) {
+	if (!item) return false;
 	if (item.id === 'finish') {
 		if (!this._multicastSelects) return false;
 		return true;
 	}
 	var actor = this._actor;
-	var result = actor && this._actor.canUse(item);
-	if (this._actor && this._isMulticast && DataManager.isSkill(item)) {
+	var result = actor && actor.canUse(item);
+	if (actor && this._isMulticast && DataManager.isSkill(item)) {
 		var canMulti = this._multicastSkills.contains(item.id);
 		var canPayTpCost = this._remainingTp >= actor.skillTpCost(item);
 		var canPayMpCost = this._remainingMp >= actor.skillMpCost(item);
