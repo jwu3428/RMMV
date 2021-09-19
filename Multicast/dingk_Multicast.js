@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Multicast v1.2.2 by dingk
+ * Multicast v1.2.3 by dingk
  * For use in RMMV 1.6.2
  ******************************************************************************/
 
@@ -8,11 +8,11 @@ Imported.dingk_Multicast = true;
 
 var dingk = dingk || {};
 dingk.Multicast = dingk.Multicast || {};
-dingk.Multicast.version = '1.2.2';
+dingk.Multicast.version = '1.2.3';
 dingk.Multicast.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
 
 /*:
- * @plugindesc [v1.2.2] Allows an actor to select and perform multiple skills at once.
+ * @plugindesc [v1.2.3] Allows an actor to select and perform multiple skills at once.
  * @author dingk
  *
  * @param Multicast Type
@@ -113,8 +113,12 @@ dingk.Multicast.filename = document.currentScript.src.match(/([^\/]+)\.js/)[1];
  * -----------------------------------------------------------------------------
  *   Changelog
  * -----------------------------------------------------------------------------
+ * v1.2.3 - Bug fix (2021-09-19)
+ *  - Fixed a bug that caused the game to crash when selecting 'Fight' after 
+ *    finishing a triple (or more) cast selection early with only one member in
+ *    your party.
  * v1.2.2 - Bug fix (2021-09-17)
- *  - Fixed an bug that caused the game to crash when trying to select a skill 
+ *  - Fixed a bug that caused the game to crash when trying to select a skill 
  *    when the actor has not learned any.
  * v1.2.1 - Hot fix (2020-05-04)
  *  - Fixed an issue with YEP_BattleEngineCore that caused actor and enemy 
@@ -567,17 +571,19 @@ Scene_Battle.prototype.selectNextCommand = function() {
 	}
 	
 	// Add new action if multicasting
-	if (this._skillWindow._multicastCount > 0) {
-		this._skillWindow._multicastCount--;
-		actor._actions.push(new Game_Action(actor));
-	}
-	// Else revert back to normal
-	else if (this._skillWindow._isMulticast) {
-		this._skillWindow._isMulticast = false;
-		if (actor) {
-			actor._multicastCount = 1;
-			$gameParty.restoreContainers(actor._mcItems, actor._mcWeapons, actor._mcArmors);
-			actor.setLastBattleSkill(actor._lastMulticast);
+	if (this._skillWindow._isMulticast) {
+		if (this._skillWindow._multicastCount > 0) {
+			this._skillWindow._multicastCount--;
+			actor._actions.push(new Game_Action(actor));
+		}
+		// Else revert back to normal
+		else {
+			this._skillWindow._isMulticast = false;
+			if (actor) {
+				actor._multicastCount = 1;
+				$gameParty.restoreContainers(actor._mcItems, actor._mcWeapons, actor._mcArmors);
+				actor.setLastBattleSkill(actor._lastMulticast);
+			}
 		}
 	}
 	// Determine next command based on multicast type
