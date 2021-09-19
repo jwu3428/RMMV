@@ -7,13 +7,13 @@ You need to create an [RPG Maker Forums](https://forums.rpgmakerweb.com/) accoun
 Stable plugins are feature-complete and are unlikely to have big changes in the future.
 
 <h3 style='text-align: left'>
-  <a href='https://forums.rpgmakerweb.com/index.php?threads/110706/'>Multicast v1.2.2</a>
+  <a href='https://forums.rpgmakerweb.com/index.php?threads/110706/'>Multicast v1.2.3</a>
   <span style='float: right'>
     <a href='https://raw.githubusercontent.com/jwu3428/RMMV/master/Multicast/dingk_Multicast.js'>Code</a>
   </span>
 </h3>
 
-*Updated September 17, 2021*  
+*Updated September 19, 2021*  
 Allow actors to perform more than one skill per turn.
 
 <h3 style='text-align: left'>
